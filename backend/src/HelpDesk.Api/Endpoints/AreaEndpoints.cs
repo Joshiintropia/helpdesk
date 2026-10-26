@@ -16,6 +16,7 @@ public static class AreaEndpoints
         var areas = app.MapGroup("/api/areas").RequireAuthorization();
         areas.MapGet("/", ListAreas);
         areas.MapPost("/", CreateArea).RequireAuthorization(p => p.RequireRole(Roles.Admin));
+        areas.MapPut("/{areaId:int}", UpdateArea).RequireAuthorization(p => p.RequireRole(Roles.Admin));
         areas.MapPost("/{areaId:int}/members", AddMember).RequireAuthorization(p => p.RequireRole(Roles.Admin));
         return app;
     }
@@ -36,7 +37,7 @@ public static class AreaEndpoints
             .Select(a => new AreaDto(a.Id, a.Name, a.Description, a.AcceptsRequests))
             .ToListAsync(ct);
 
-        return TypedResults.Ok(new MeDto(user.Id, user.Email ?? "", user.DisplayName, roles.ToList(), areas));
+        return TypedResults.Ok(new MeDto(user.Id, user.Email ?? "", user.DisplayName, user.MustChangePassword, roles.ToList(), areas));
     }
 
     /// <summary>
@@ -70,6 +71,32 @@ public static class AreaEndpoints
         db.Areas.Add(area);
         await db.SaveChangesAsync(ct);
         return TypedResults.Created($"/api/areas/{area.Id}", new AreaDto(area.Id, area.Name, area.Description, area.AcceptsRequests));
+    }
+
+    private static async Task<IResult> UpdateArea(int areaId, UpdateAreaRequest request, HelpDeskDbContext db, CancellationToken ct)
+    {
+        var area = await db.Areas.FindAsync([areaId], ct);
+        if (area is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["name"] = ["El nombre es obligatorio."] });
+        }
+
+        var name = request.Name.Trim();
+        if (await db.Areas.AnyAsync(a => a.Name == name && a.Id != areaId, ct))
+        {
+            return TypedResults.Conflict(new { message = "Ya existe un área con ese nombre." });
+        }
+
+        area.Name = name;
+        area.Description = request.Description?.Trim();
+        area.AcceptsRequests = request.AcceptsRequests;
+        await db.SaveChangesAsync(ct);
+        return TypedResults.Ok(new AreaDto(area.Id, area.Name, area.Description, area.AcceptsRequests));
     }
 
     private static async Task<IResult> AddMember(
