@@ -6,6 +6,7 @@ using HelpDesk.Infrastructure;
 using HelpDesk.Infrastructure.Identity;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,11 +16,17 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUser>();
 
-builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddIdentityCookies();
+var microsoftLogin = builder.Configuration.GetSection(MicrosoftLoginOptions.Section).Get<MicrosoftLoginOptions>() ?? new();
+builder.Services.Configure<MicrosoftLoginOptions>(builder.Configuration.GetSection(MicrosoftLoginOptions.Section));
+
+var authentication = builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme);
+authentication.AddIdentityCookies();
+authentication.AddMicrosoftLogin(microsoftLogin);
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "helpdesk.auth";
-    options.Cookie.SameSite = SameSiteMode.Strict;
+    // Lax (not Strict) so the session survives the redirect back from Microsoft 365.
+    options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.HttpOnly = true;
     options.SlidingExpiration = true;
     options.ExpireTimeSpan = TimeSpan.FromHours(10);
@@ -38,6 +45,15 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 builder.Services.AddAuthorization();
 
+// Behind nginx (docker-compose) or another reverse proxy: trust X-Forwarded-Proto so cookies and the
+// Microsoft redirect use https. Only the proxy is published, so any forwarder is accepted.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
@@ -45,6 +61,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddDbContextCheck<HelpDeskDbContext>();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Business-rule violations become 422 with a message the UI can show as-is.
 app.UseExceptionHandler(errors => errors.Run(async context =>
@@ -73,6 +91,7 @@ if (app.Configuration.GetValue("Database:InitializeOnStartup", true))
 }
 
 app.UseAuthentication();
+app.UseMustChangePassword();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
@@ -84,12 +103,8 @@ app.MapGroup("/api/auth")
             ? TypedResults.NotFound()
             : await next(context))
     .MapIdentityApi<ApplicationUser>();
-app.MapPost("/api/auth/logout", async (SignInManager<ApplicationUser> signIn) =>
-{
-    await signIn.SignOutAsync();
-    return TypedResults.NoContent();
-}).RequireAuthorization();
-
+app.MapAccountEndpoints();
+app.MapUserAdminEndpoints();
 app.MapAreaEndpoints();
 app.MapTicketEndpoints();
 

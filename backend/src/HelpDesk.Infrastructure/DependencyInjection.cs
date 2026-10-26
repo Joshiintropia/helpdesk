@@ -28,11 +28,15 @@ public static class DependencyInjection
             })
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<HelpDeskDbContext>()
-            .AddSignInManager()
+            .AddClaimsPrincipalFactory<AppClaimsPrincipalFactory>()
+            .AddErrorDescriber<SpanishIdentityErrorDescriber>()
             .AddDefaultTokenProviders()
-            .AddApiEndpoints();
+            .AddApiEndpoints()
+            // After AddApiEndpoints, which registers the default SignInManager and would replace ours.
+            .AddSignInManager<AppSignInManager>();
 
         services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<ExternalLoginService>();
         return services;
     }
 }

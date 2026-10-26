@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from './client'
-import type { Area, Me, QueueItem, TicketDetail, TicketSummary } from './types'
+import type { Area, AssignableRole, AuthProviders, Me, QueueItem, TicketDetail, TicketSummary, UserAdmin, UserWithPassword } from './types'
 
 export function useMe() {
   return useQuery({
@@ -30,6 +30,72 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => api.post('/api/auth/logout'),
     onSuccess: () => client.clear(),
+  })
+}
+
+export function useAuthProviders() {
+  return useQuery({ queryKey: ['auth', 'providers'], queryFn: () => api.get<AuthProviders>('/api/auth/providers'), staleTime: Infinity })
+}
+
+export function useChangePassword() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newPassword: string }) => api.post('/api/account/change-password', input),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['me'] }),
+  })
+}
+
+export interface UserInput {
+  email?: string
+  displayName: string
+  isActive?: boolean
+  roles: AssignableRole[]
+  areaIds: number[]
+}
+
+export function useUsers() {
+  return useQuery({ queryKey: ['admin', 'users'], queryFn: () => api.get<UserAdmin[]>('/api/admin/users') })
+}
+
+export function useCreateUser() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UserInput) => api.post<UserWithPassword>('/api/admin/users', input),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  })
+}
+
+export function useUpdateUser() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...input }: UserInput & { id: string }) => api.put<UserAdmin>(`/api/admin/users/${id}`, input),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['admin', 'users'] })
+      client.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+}
+
+export function useResetPassword() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post<UserWithPassword>(`/api/admin/users/${id}/reset-password`),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  })
+}
+
+export interface AreaInput {
+  name: string
+  description: string | null
+  acceptsRequests: boolean
+}
+
+export function useSaveArea() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...input }: AreaInput & { id?: number }) =>
+      id ? api.put<Area>(`/api/areas/${id}`, input) : api.post<Area>('/api/areas', input),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['areas'] }),
   })
 }
 

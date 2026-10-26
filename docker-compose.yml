@@ -28,6 +28,11 @@ services:
       ConnectionStrings__HelpDesk: Host=db;Database=helpdesk;Username=helpdesk;Password=${POSTGRES_PASSWORD}
       Seed__AdminEmail: ${ADMIN_EMAIL:-}
       Seed__AdminPassword: ${ADMIN_PASSWORD:-}
+      Auth__Microsoft__Enabled: ${MICROSOFT_LOGIN_ENABLED:-false}
+      Auth__Microsoft__TenantId: ${MICROSOFT_TENANT_ID:-}
+      Auth__Microsoft__ClientId: ${MICROSOFT_CLIENT_ID:-}
+      Auth__Microsoft__ClientSecret: ${MICROSOFT_CLIENT_SECRET:-}
+      Auth__Microsoft__AutoProvision: ${MICROSOFT_AUTO_PROVISION:-true}
 
   web:
     build: ./frontend
