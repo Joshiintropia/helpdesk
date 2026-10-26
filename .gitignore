@@ -1,0 +1,20 @@
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+
+# Node
+node_modules/
+dist/
+
+# Editors / OS
+.vs/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# Local configuration
+.env
+*.local
