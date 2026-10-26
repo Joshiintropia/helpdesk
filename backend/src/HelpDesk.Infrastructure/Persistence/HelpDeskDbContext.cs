@@ -1,6 +1,7 @@
 using HelpDesk.Domain.Areas;
 using HelpDesk.Domain.Sla;
 using HelpDesk.Domain.Tickets;
+using HelpDesk.Infrastructure.Email;
 using HelpDesk.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -20,6 +21,8 @@ public class HelpDeskDbContext(DbContextOptions<HelpDeskDbContext> options)
     public DbSet<TicketEvent> TicketEvents => Set<TicketEvent>();
     public DbSet<SlaPolicy> SlaPolicies => Set<SlaPolicy>();
     public DbSet<BusinessCalendar> BusinessCalendars => Set<BusinessCalendar>();
+    public DbSet<ProcessedEmail> ProcessedEmails => Set<ProcessedEmail>();
+    public DbSet<EmailNotification> EmailNotifications => Set<EmailNotification>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -46,5 +49,7 @@ public class HelpDeskDbContext(DbContextOptions<HelpDeskDbContext> options)
         builder.Properties<MessageVisibility>().HaveConversion<string>().HaveMaxLength(32);
         builder.Properties<MessageSource>().HaveConversion<string>().HaveMaxLength(16);
         builder.Properties<TicketEventType>().HaveConversion<string>().HaveMaxLength(32);
+        builder.Properties<InboundOutcome>().HaveConversion<string>().HaveMaxLength(32);
+        builder.Properties<NotificationKind>().HaveConversion<string>().HaveMaxLength(16);
     }
 }
