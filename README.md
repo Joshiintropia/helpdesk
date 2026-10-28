@@ -64,6 +64,13 @@ En *Métricas*, cada agente ve sus áreas y los supervisores y administradores v
 - Porcentaje de primera respuesta y de resolución a tiempo, y el tiempo típico (mediana) en horas hábiles.
 - Por área: pendientes según cómo van con su SLA, recibidas, resueltas, cuántas escaló y su cumplimiento.
 - Escalamientos: hacia dónde se mueven los tickets entre áreas.
+- Satisfacción: calificación promedio y cuántas respuestas hubo de 1 a 5 estrellas, en total y por área.
+
+## Adjuntos, encuesta y cierre automático
+
+- **Adjuntos.** Se pueden adjuntar hasta 5 archivos de máximo 10 MB por solicitud o mensaje (`ATTACHMENT_MAX_BYTES`), desde la web o en el correo al buzón de ayuda. Por seguridad no se aceptan ejecutables ni scripts (`.exe`, `.bat`, `.ps1`, `.js`, `.html`, `.svg`, entre otros). Las imágenes se muestran en miniatura; los demás archivos se descargan. Los archivos de una nota interna solo los ven las áreas. Se guardan en el volumen `app-data`, junto con las llaves que firman cookies y enlaces: respalda ese volumen igual que la base de datos.
+- **Encuesta.** Cuando se resuelve una solicitud, el solicitante puede calificarla de 1 a 5 estrellas con un comentario, en la aplicación o desde el enlace del correo, sin iniciar sesión. El enlace vale 30 días. Puede cambiar su calificación mientras la solicitud siga resuelta.
+- **Cierre automático.** Una solicitud resuelta se cierra sola después de 3 días hábiles sin respuesta (`TICKETS_AUTO_CLOSE_DAYS`; 0 lo desactiva). Si el solicitante escribe antes, se reabre. El solicitante o el agente también pueden cerrarla en ese momento. Si alguien responde por correo a una solicitud ya cerrada, se abre una nueva que menciona la anterior.
 
 ## Desarrollo local
 
@@ -116,11 +123,8 @@ frontend/                      Portal del solicitante y bandeja de agentes
 - `ticket_events`: bitácora de cada cambio; de aquí salen las métricas y la auditoría.
 - `processed_emails`: cada correo leído del buzón y qué se hizo con él.
 - `email_notifications`: avisos por enviar y enviados, con sus errores.
+- `ticket_attachments`: archivos adjuntos; el contenido vive en disco (`Storage:Path`) y aquí su nombre, tipo, tamaño y a qué ticket y mensaje pertenecen.
 - `areas`, `area_members`, `categories`, `sla_policies`, `business_calendars`, `holidays`, y las tablas de usuarios y roles.
-
-## Próximos pasos
-
-1. Adjuntos, encuesta de satisfacción y cierre automático de tickets resueltos.
 
 ## Licencia
 

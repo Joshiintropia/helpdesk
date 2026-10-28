@@ -1,5 +1,6 @@
 using HelpDesk.Domain;
 using HelpDesk.Domain.Tickets;
+using HelpDesk.Infrastructure.Attachments;
 using HelpDesk.Infrastructure.Identity;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -16,6 +17,7 @@ namespace HelpDesk.Infrastructure.Email;
 public class EmailIngestionService(
     HelpDeskDbContext db,
     UserManager<ApplicationUser> users,
+    AttachmentService attachments,
     IOptions<EmailOptions> options,
     TimeProvider clock,
     ILogger<EmailIngestionService> logger)
@@ -68,13 +70,21 @@ public class EmailIngestionService(
         }
 
         var now = clock.GetUtcNow();
-        if (EmailText.TicketIdFromSubject(email.Subject) is { } ticketId
-            && await TryAddToTicketAsync(ticketId, sender, email, now, cancellationToken))
+        var taggedId = EmailText.TicketIdFromSubject(email.Subject);
+        if (taggedId is { } ticketId && await TryAddToTicketAsync(ticketId, sender, email, now, cancellationToken))
         {
             return (InboundOutcome.MessageAdded, ticketId);
         }
 
         var body = email.Body.Trim();
+
+        // A reply to their own closed request opens a new one that points back to it.
+        if (taggedId is { } closedId
+            && await db.Tickets.AnyAsync(t => t.Id == closedId && t.RequesterId == sender.Id && t.Status == TicketStatus.Closed, cancellationToken))
+        {
+            body = $"Seguimiento de la solicitud #{closedId}.\n\n{EmailText.StripQuotedReply(body)}".Trim();
+        }
+
         var subject = EmailText.CleanSubject(email.Subject);
         if (body.Length == 0 && subject.Length == 0)
         {
@@ -89,6 +99,7 @@ public class EmailIngestionService(
             TicketPriority.Normal,
             now);
         db.Tickets.Add(ticket);
+        await attachments.AddFromEmailAsync(email.Attachments ?? [], sender.Id, ticket, messageId: null, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return (InboundOutcome.TicketCreated, ticket.Id);
     }
@@ -105,14 +116,20 @@ public class EmailIngestionService(
         var reply = EmailText.StripQuotedReply(email.Body);
         if (reply.Length == 0)
         {
-            return false;
+            if (email.Attachments is not { Count: > 0 })
+            {
+                return false;
+            }
+
+            reply = AttachmentsOnlyText;
         }
 
+        TicketMessage message;
         try
         {
             if (ticket.RequesterId == sender.Id)
             {
-                ticket.AddRequesterMessage(reply, MessageSource.Email, now);
+                message = ticket.AddRequesterMessage(reply, MessageSource.Email, now);
             }
             else
             {
@@ -128,7 +145,7 @@ public class EmailIngestionService(
                     return false;
                 }
 
-                ticket.AddAgentMessage(sender.Id, area.Value, reply, MessageVisibility.Public, now);
+                message = ticket.AddAgentMessage(sender.Id, area.Value, reply, MessageVisibility.Public, now);
             }
         }
         catch (DomainException)
@@ -136,6 +153,7 @@ public class EmailIngestionService(
             return false;
         }
 
+        await attachments.AddFromEmailAsync(email.Attachments ?? [], sender.Id, ticket, message.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -179,6 +197,9 @@ public class EmailIngestionService(
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("No hay ninguna área activa para recibir tickets por correo.");
     }
+
+    /// <summary>The message text when someone only sends files.</summary>
+    public const string AttachmentsOnlyText = "Archivos adjuntos.";
 
     private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
 }

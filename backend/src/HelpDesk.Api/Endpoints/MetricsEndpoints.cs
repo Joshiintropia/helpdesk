@@ -57,7 +57,7 @@ public static class MetricsEndpoints
             .AsNoTracking()
             .Include(t => t.Segments)
             .Where(t => t.Segments.Any(s => scope.Contains(s.AreaId)))
-            .Where(t => t.CreatedAt >= from || t.ResolvedAt >= from || (t.Status != TicketStatus.Resolved && t.Status != TicketStatus.Closed))
+            .Where(t => t.CreatedAt >= from || t.ResolvedAt >= from || t.RatedAt >= from || (t.Status != TicketStatus.Resolved && t.Status != TicketStatus.Closed))
             .AsSplitQuery()
             .ToListAsync(ct);
 
@@ -75,7 +75,8 @@ public static class MetricsEndpoints
             Resolved: tickets.Count(t => t.ResolvedAt >= from),
             Open: tickets.Count(Open),
             Overdue: inScope.Count(x => IsActive(x) && SlaStatus.For(x.Segment, x.Ticket, now).State == SlaState.Breached),
-            Sla: Compliance(inScope.Select(x => x.Segment), from, now, time));
+            Sla: Compliance(inScope.Select(x => x.Segment), from, now, time),
+            Satisfaction: Satisfaction(tickets, from));
 
         var daily = Enumerable.Range(0, days)
             .Select(i => firstDay.AddDays(i))
@@ -103,7 +104,9 @@ public static class MetricsEndpoints
                         backlog.Count(s => s == SlaState.AtRisk),
                         backlog.Count(s => s == SlaState.Breached),
                         backlog.Count(s => s == SlaState.Paused),
-                        backlog.Count(s => s == SlaState.None)));
+                        backlog.Count(s => s == SlaState.None)),
+                    // Each rating counts for every area that worked on the ticket.
+                    Satisfaction(g.Select(x => x.Ticket).Distinct(), from));
             })
             .OrderByDescending(a => a.Received)
             .ThenBy(a => a.Name)
@@ -153,6 +156,15 @@ public static class MetricsEndpoints
             ResolutionTotal: resolution.Count,
             MedianFirstResponseMinutes: Median(responseMinutes),
             MedianResolutionMinutes: Median(resolutionMinutes));
+    }
+
+    private static SatisfactionSummaryDto Satisfaction(IEnumerable<Ticket> tickets, DateTimeOffset from)
+    {
+        var ratings = tickets.Where(t => t.RatedAt >= from && t.SatisfactionRating is not null).Select(t => t.SatisfactionRating!.Value).ToList();
+        return new SatisfactionSummaryDto(
+            ratings.Count,
+            ratings.Count == 0 ? null : Math.Round(ratings.Average(), 2),
+            Enumerable.Range(1, 5).Select(star => ratings.Count(r => r == star)).ToList());
     }
 
     private static int? Median(List<int> values)

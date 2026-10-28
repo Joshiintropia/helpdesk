@@ -29,6 +29,7 @@ public class MetricsTests(SlaApiFactory factory) : IClassFixture<SlaApiFactory>
         factory.Clock.UtcNow = start.AddHours(1);
         (await chAgent.PostAsJsonAsync($"/api/tickets/{fast.Id}/messages", new { body = "Te la reenviamos" })).EnsureSuccessStatusCode();
         (await chAgent.PostAsJsonAsync($"/api/tickets/{fast.Id}/resolve", new { note = "Reenviada" })).EnsureSuccessStatusCode();
+        (await requester.PostAsJsonAsync($"/api/tickets/{fast.Id}/rate", new { rating = 4 })).EnsureSuccessStatusCode();
 
         // Ticket 2: escalated to Finance after 5 business hours (first response late); still open.
         factory.Clock.UtcNow = start;
@@ -44,6 +45,9 @@ public class MetricsTests(SlaApiFactory factory) : IClassFixture<SlaApiFactory>
         Assert.Equal(2, metrics.Totals.Received);
         Assert.Equal(1, metrics.Totals.Resolved);
         Assert.Equal(1, metrics.Totals.Open);
+        Assert.Equal(1, metrics.Totals.Satisfaction.Responses);
+        Assert.Equal(4, metrics.Totals.Satisfaction.Average);
+        Assert.Equal([0, 0, 0, 1, 0], metrics.Totals.Satisfaction.ByRating);
         Assert.Equal(2, metrics.Daily.Single(d => d.Date == new DateOnly(2026, 10, 28)).Received);
 
         var chRow = metrics.Areas.Single(a => a.AreaId == ch.Id);

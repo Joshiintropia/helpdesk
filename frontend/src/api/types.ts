@@ -96,6 +96,31 @@ export interface Message {
   visibility: MessageVisibility
   source: 'Portal' | 'Email' | 'System'
   createdAt: string
+  attachments: Attachment[]
+}
+
+export interface Attachment {
+  id: string
+  fileName: string
+  contentType: string
+  size: number
+  isImage: boolean
+}
+
+export interface Satisfaction {
+  rating: number
+  comment: string | null
+  ratedAt: string
+}
+
+/** The survey reached from the email link, without signing in. */
+export interface Survey {
+  ticketId: number
+  title: string
+  status: TicketStatus
+  canRate: boolean
+  rating: number | null
+  comment: string | null
 }
 
 export interface TicketDetail {
@@ -113,6 +138,9 @@ export interface TicketDetail {
   /** Only present for agents: the escalation chain is internal. */
   segments: Segment[] | null
   messages: Message[]
+  /** Files sent with the request itself; files sent later live on their message. */
+  attachments: Attachment[]
+  satisfaction: Satisfaction | null
 }
 
 export interface QueueItem {
@@ -187,13 +215,21 @@ export interface AreaMetrics {
   escalatedOut: number
   sla: SlaCompliance
   backlog: Backlog
+  satisfaction: SatisfactionSummary
+}
+
+/** byRating[0] counts one-star answers, byRating[4] five stars. */
+export interface SatisfactionSummary {
+  responses: number
+  average: number | null
+  byRating: number[]
 }
 
 export interface Metrics {
   from: string
   to: string
   timeZone: string
-  totals: { received: number; resolved: number; open: number; overdue: number; sla: SlaCompliance }
+  totals: { received: number; resolved: number; open: number; overdue: number; sla: SlaCompliance; satisfaction: SatisfactionSummary }
   daily: { date: string; received: number; resolved: number }[]
   areas: AreaMetrics[]
   escalations: { fromAreaId: number; fromName: string; toAreaId: number; toName: string; count: number }[]

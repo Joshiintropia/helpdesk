@@ -8,6 +8,7 @@ import MyRequestsPage from './pages/MyRequestsPage'
 import NewRequestPage from './pages/NewRequestPage'
 import QueuePage from './pages/QueuePage'
 import SlaPage from './pages/SlaPage'
+import SurveyPage from './pages/SurveyPage'
 import TicketPage from './pages/TicketPage'
 import UsersPage from './pages/UsersPage'
 
@@ -15,6 +16,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/entrar" element={<LoginPage />} />
+      <Route path="/encuesta/:token" element={<SurveyPage />} />
       <Route element={<SignedIn />}>
         <Route index element={<Navigate to="/nueva" replace />} />
         <Route path="/nueva" element={<NewRequestPage />} />

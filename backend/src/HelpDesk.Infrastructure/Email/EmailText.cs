@@ -19,6 +19,7 @@ public static partial class EmailText
     {
         var clean = TicketTag().Replace(subject ?? "", "");
         clean = ReplyPrefix().Replace(clean, "");
+        clean = NotificationPrefix().Replace(clean, "");
         return clean.Trim();
     }
 
@@ -54,6 +55,10 @@ public static partial class EmailText
 
     [GeneratedRegex(@"^(\s*(re|rv|fw|fwd|reenviar|responder)\s*:\s*)+", RegexOptions.IgnoreCase)]
     private static partial Regex ReplyPrefix();
+
+    // The start of our own notification subjects, so a reply keeps only the ticket's title.
+    [GeneratedRegex(@"^\s*(Recibimos tu solicitud|Respuesta a tu solicitud|Tu solicitud quedó resuelta)\s*:\s*", RegexOptions.IgnoreCase)]
+    private static partial Regex NotificationPrefix();
 
     [GeneratedRegex(
         @"^(-{2,}\s*(original message|mensaje original)\s*-{2,}|_{10,}|(de|from)\s*:\s*.+|(el|on)\s.+(escribió|wrote)\s*:)$",

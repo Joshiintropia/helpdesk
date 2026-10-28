@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAreas, useCreateTicket } from '../api/hooks'
 import type { Area } from '../api/types'
+import { FilePicker } from '../components/attachments'
 import { Button, Card, ErrorText } from '../components/ui'
+import { usePendingFiles } from '../components/usePendingFiles'
 
 /** Two steps, no jargon: who can help you, and what is happening. */
 export default function NewRequestPage() {
@@ -11,12 +13,13 @@ export default function NewRequestPage() {
   const navigate = useNavigate()
   const [area, setArea] = useState<Area | null>(null)
   const [description, setDescription] = useState('')
+  const files = usePendingFiles()
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!area) return
     create.mutate(
-      { areaId: area.id, description },
+      { areaId: area.id, description, attachmentIds: files.ids },
       { onSuccess: (ticket) => navigate(`/solicitudes/${ticket.id}`) },
     )
   }
@@ -64,8 +67,12 @@ export default function NewRequestPage() {
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5"
           />
         </label>
+        <div>
+          <p className="mb-2 text-slate-600">¿Tienes una captura de pantalla o un documento que ayude? Adjúntalo.</p>
+          <FilePicker pending={files} />
+        </div>
         <ErrorText error={create.error} />
-        <Button type="submit" disabled={create.isPending || !description.trim()}>
+        <Button type="submit" disabled={create.isPending || files.uploading || !description.trim()}>
           {create.isPending ? 'Enviando…' : 'Enviar solicitud'}
         </Button>
       </form>

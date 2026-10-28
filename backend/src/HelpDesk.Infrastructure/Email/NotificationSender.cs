@@ -11,6 +11,7 @@ namespace HelpDesk.Infrastructure.Email;
 public class NotificationSender(
     HelpDeskDbContext db,
     IMailSender sender,
+    SurveyLinks surveys,
     IOptions<EmailOptions> options,
     TimeProvider clock,
     ILogger<NotificationSender> logger)
@@ -104,7 +105,10 @@ public class NotificationSender(
                 subject = $"{tag} Tu solicitud quedó resuelta: {ticket.Title}";
                 body.AppendLine("Marcamos tu solicitud como resuelta.")
                     .AppendLine()
-                    .AppendLine("Si el problema sigue, responde a este correo y la reabrimos.");
+                    .AppendLine("Si el problema sigue, responde a este correo y la reabrimos. Si no recibimos respuesta en unos días, la cerraremos.")
+                    .AppendLine()
+                    .AppendLine("¿Cómo te atendimos? Califícanos en un clic:")
+                    .AppendLine($"{options.Value.AppUrl.TrimEnd('/')}/encuesta/{surveys.TokenFor(ticket.Id)}");
                 break;
 
             default:

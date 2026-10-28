@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAreas, useMe, useMetrics } from '../api/hooks'
-import type { AreaMetrics, Backlog, Metrics, SlaCompliance } from '../api/types'
+import type { AreaMetrics, Backlog, Metrics, SatisfactionSummary, SlaCompliance } from '../api/types'
 import { Card, ErrorText } from '../components/ui'
 import { formatMinutes } from '../format'
 
@@ -64,6 +64,7 @@ export default function DashboardPage() {
         <div className={`space-y-6 transition-opacity ${isFetching ? 'opacity-60' : ''}`}>
           <Kpis metrics={data} />
           <DailyChart daily={data.daily} />
+          <SatisfactionChart satisfaction={data.totals.satisfaction} />
           <AreasTable areas={data.areas} />
           <Escalations escalations={data.escalations} />
           <p className="text-sm text-slate-500">
@@ -283,7 +284,7 @@ function AreasTable({ areas }: { areas: AreaMetrics[] }) {
             ))}
           </ul>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left tabular-nums">
+            <table className="w-full min-w-[800px] text-left tabular-nums">
               <thead className="text-sm text-slate-500">
                 <tr>
                   <th className="py-2 pr-3 font-medium">Área</th>
@@ -293,7 +294,8 @@ function AreasTable({ areas }: { areas: AreaMetrics[] }) {
                   <th className="py-2 pr-3 text-right font-medium">Escaló</th>
                   <th className="py-2 pr-3 text-right font-medium">1.ª respuesta a tiempo</th>
                   <th className="py-2 pr-3 text-right font-medium">Resolución a tiempo</th>
-                  <th className="py-2 text-right font-medium">Tiempo típico</th>
+                  <th className="py-2 pr-3 text-right font-medium">Tiempo típico</th>
+                  <th className="py-2 text-right font-medium">Satisfacción</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,8 +310,17 @@ function AreasTable({ areas }: { areas: AreaMetrics[] }) {
                     <td className="py-3 pr-3 text-right">{a.escalatedOut}</td>
                     <td className="py-3 pr-3 text-right">{compliance(a.sla, 'first')}</td>
                     <td className="py-3 pr-3 text-right">{compliance(a.sla, 'resolution')}</td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 pr-3 text-right">
                       {a.sla.medianResolutionMinutes === null ? <span className="text-slate-400">—</span> : formatMinutes(a.sla.medianResolutionMinutes)}
+                    </td>
+                    <td className="py-3 text-right">
+                      {a.satisfaction.average === null ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <span title={`${a.satisfaction.responses} respuestas`}>
+                          {formatAverage(a.satisfaction.average)} <span className="text-slate-500">({a.satisfaction.responses})</span>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -323,6 +334,53 @@ function AreasTable({ areas }: { areas: AreaMetrics[] }) {
 }
 
 /** Stacked horizontal bar of an area's open segments, scaled to the busiest area so rows compare. */
+const formatAverage = (average: number) => average.toLocaleString('es-MX', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+/** Survey answers: the average, and how the answers spread from five stars down to one. Values are labeled directly. */
+function SatisfactionChart({ satisfaction }: { satisfaction: SatisfactionSummary }) {
+  const max = Math.max(1, ...satisfaction.byRating)
+  const rows = [5, 4, 3, 2, 1].map((stars) => ({ stars, count: satisfaction.byRating[stars - 1] }))
+  return (
+    <Card>
+      <h2 className="mb-1 text-lg font-semibold">Satisfacción</h2>
+      <p className="mb-4 text-sm text-slate-600">Encuesta que recibe el solicitante al resolver su solicitud.</p>
+      {satisfaction.responses === 0 ? (
+        <p className="text-slate-500">Todavía no hay respuestas en el periodo.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-8">
+          <div>
+            <p className="text-4xl font-semibold text-slate-900 tabular-nums">
+              {formatAverage(satisfaction.average!)}
+              <span className="text-xl font-normal text-slate-500"> / 5</span>
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              {satisfaction.responses} {satisfaction.responses === 1 ? 'respuesta' : 'respuestas'}
+            </p>
+          </div>
+          <ul className="min-w-60 flex-1 space-y-1.5 tabular-nums" aria-label="Respuestas por calificación">
+            {rows.map((r) => (
+              <li key={r.stars} className="flex items-center gap-3">
+                <span className="w-20 shrink-0 text-sm text-slate-600">
+                  {r.stars} {r.stars === 1 ? 'estrella' : 'estrellas'}
+                </span>
+                <span className="relative h-4 flex-1">
+                  {r.count > 0 && (
+                    <span
+                      className="absolute inset-y-0 left-0 rounded"
+                      style={{ width: `${(r.count / max) * 100}%`, background: '#2a78d6' }}
+                    />
+                  )}
+                </span>
+                <span className="w-8 shrink-0 text-right text-sm">{r.count}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function BacklogBar({ backlog, total, max }: { backlog: Backlog; total: number; max: number }) {
   const parts = backlogParts.filter((p) => backlog[p.key] > 0)
   const summary = parts.map((p) => `${backlog[p.key]} ${p.label.toLowerCase()}`).join(', ')

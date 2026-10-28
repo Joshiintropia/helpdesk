@@ -10,11 +10,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+  // FormData sets its own multipart Content-Type with the boundary.
+  const form = body instanceof FormData
   const response = await fetch(url, {
     method,
     credentials: 'same-origin',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined || form ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   })
 
   if (!response.ok) {
@@ -43,4 +45,9 @@ export const api = {
   post: <T>(url: string, body?: unknown) => request<T>('POST', url, body ?? {}),
   put: <T>(url: string, body: unknown) => request<T>('PUT', url, body),
   delete: <T>(url: string) => request<T>('DELETE', url),
+  upload: <T>(url: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<T>('POST', url, form)
+  },
 }
