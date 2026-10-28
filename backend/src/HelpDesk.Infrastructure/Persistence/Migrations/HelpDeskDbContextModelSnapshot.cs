@@ -505,6 +505,113 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                     b.ToTable("ticket_segments", (string)null);
                 });
 
+            modelBuilder.Entity("HelpDesk.Infrastructure.Email.EmailNotification", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<long>("TicketId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ticket_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_notifications");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("ix_email_notifications_pending")
+                        .HasFilter("sent_at IS NULL");
+
+                    b.HasIndex("TicketId")
+                        .HasDatabaseName("ix_email_notifications_ticket_id");
+
+                    b.ToTable("email_notifications", (string)null);
+                });
+
+            modelBuilder.Entity("HelpDesk.Infrastructure.Email.ProcessedEmail", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("from_address");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasMaxLength(998)
+                        .HasColumnType("character varying(998)")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subject");
+
+                    b.Property<long?>("TicketId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ticket_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_processed_emails");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_processed_emails_message_id");
+
+                    b.HasIndex("TicketId")
+                        .HasDatabaseName("ix_processed_emails_ticket_id");
+
+                    b.ToTable("processed_emails", (string)null);
+                });
+
             modelBuilder.Entity("HelpDesk.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -908,6 +1015,27 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_ticket_segments_tickets_ticket_id");
 
                     b.Navigation("Ticket");
+                });
+
+            modelBuilder.Entity("HelpDesk.Infrastructure.Email.EmailNotification", b =>
+                {
+                    b.HasOne("HelpDesk.Domain.Tickets.Ticket", "Ticket")
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_email_notifications_tickets_ticket_id");
+
+                    b.Navigation("Ticket");
+                });
+
+            modelBuilder.Entity("HelpDesk.Infrastructure.Email.ProcessedEmail", b =>
+                {
+                    b.HasOne("HelpDesk.Domain.Tickets.Ticket", null)
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_processed_emails_tickets_ticket_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

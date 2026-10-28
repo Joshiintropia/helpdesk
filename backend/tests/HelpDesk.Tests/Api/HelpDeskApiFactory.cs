@@ -9,7 +9,7 @@ namespace HelpDesk.Tests.Api;
 /// Runs the real API against a throwaway PostgreSQL database. Set HELPDESK_TEST_DB to point at another
 /// server; by default it uses the same local credentials as docker-compose.
 /// </summary>
-public sealed class HelpDeskApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class HelpDeskApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string AdminEmail = "admin@test.local";
     public const string Password = "Contrasena123";
