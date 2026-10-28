@@ -27,6 +27,32 @@ public class TicketSegment
     public DateTimeOffset? ResolvedAt { get; private set; }
     public string? ResolutionNote { get; private set; }
 
+    /// <summary>When this area first acted on the segment: a message, an escalation or a resolution.</summary>
+    public DateTimeOffset? FirstRespondedAt { get; private set; }
+
+    /// <summary>The SLA policy the due dates come from; null when no policy applies.</summary>
+    public int? SlaPolicyId { get; private set; }
+
+    public DateTimeOffset? FirstResponseDueAt { get; private set; }
+    public DateTimeOffset? ResolutionDueAt { get; private set; }
+
+    /// <summary>
+    /// Business minutes the clock was stopped: while waiting on the requester, while the ticket was resolved,
+    /// and while another area worked on what this one escalated. Each area is measured only on its own time.
+    /// </summary>
+    public int SlaPausedMinutes { get; private set; }
+
+    public void SetSlaTargets(int? policyId, DateTimeOffset? firstResponseDueAt, DateTimeOffset? resolutionDueAt)
+    {
+        SlaPolicyId = policyId;
+        FirstResponseDueAt = firstResponseDueAt;
+        ResolutionDueAt = resolutionDueAt;
+    }
+
+    public void AddSlaPause(int businessMinutes) => SlaPausedMinutes += Math.Max(0, businessMinutes);
+
+    internal void MarkResponded(DateTimeOffset now) => FirstRespondedAt ??= now;
+
     internal static TicketSegment Start(
         Ticket ticket,
         int areaId,
@@ -47,6 +73,7 @@ public class TicketSegment
 
     internal void Resolve(string? note, DateTimeOffset now)
     {
+        MarkResponded(now);
         Status = SegmentStatus.Resolved;
         ResolvedAt = now;
         ResolutionNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();

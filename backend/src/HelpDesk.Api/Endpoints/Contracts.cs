@@ -1,3 +1,4 @@
+using HelpDesk.Domain.Sla;
 using HelpDesk.Domain.Tickets;
 
 namespace HelpDesk.Api.Endpoints;
@@ -26,6 +27,14 @@ public record EscalateRequest(Guid SegmentId, int ToAreaId, string Reason);
 
 public record ResolveRequest(string? Note);
 
+public record ChangePriorityRequest(TicketPriority Priority);
+
+/// <summary>Where a segment stands against its SLA: which target counts now, when it is due, and how it is going.</summary>
+public record SlaDto(SlaState State, SlaTarget? Target, DateTimeOffset? DueAt)
+{
+    public static SlaDto From(SlaStatus status) => new(status.State, status.Target, status.DueAt);
+}
+
 public record PersonDto(Guid Id, string DisplayName);
 
 public record TicketSummaryDto(
@@ -49,7 +58,11 @@ public record SegmentDto(
     PersonDto? Assignee,
     DateTimeOffset OpenedAt,
     DateTimeOffset? ResolvedAt,
-    string? ResolutionNote);
+    string? ResolutionNote,
+    DateTimeOffset? FirstRespondedAt,
+    DateTimeOffset? FirstResponseDueAt,
+    DateTimeOffset? ResolutionDueAt,
+    SlaDto Sla);
 
 public record MessageDto(
     Guid Id,
@@ -89,4 +102,27 @@ public record QueueItemDto(
     Guid? AssigneeId,
     string? EscalationReason,
     DateTimeOffset OpenedAt,
-    DateTimeOffset TicketCreatedAt);
+    DateTimeOffset TicketCreatedAt,
+    SlaDto Sla);
+
+public record CalendarDto(
+    int Id,
+    string Name,
+    string TimeZone,
+    TimeOnly WorkdayStart,
+    TimeOnly WorkdayEnd,
+    IReadOnlyCollection<DayOfWeek> WorkingDays,
+    IReadOnlyCollection<HolidayDto> Holidays);
+
+public record HolidayDto(int Id, DateOnly Date, string Name);
+
+public record UpdateCalendarRequest(string TimeZone, TimeOnly WorkdayStart, TimeOnly WorkdayEnd, IReadOnlyCollection<DayOfWeek> WorkingDays);
+
+public record AddHolidayRequest(DateOnly Date, string Name);
+
+/// <summary>Targets in business minutes. AreaId null is the general policy for that priority.</summary>
+public record SlaPolicyDto(int Id, int? AreaId, TicketPriority Priority, int FirstResponseMinutes, int ResolutionMinutes);
+
+public record SaveSlaPolicyRequest(int? AreaId, TicketPriority Priority, int FirstResponseMinutes, int ResolutionMinutes);
+
+public record SlaSettingsDto(CalendarDto Calendar, IReadOnlyCollection<SlaPolicyDto> Policies);

@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router'
 import { useAreas, useMe, useTicket, useTicketAction } from '../api/hooks'
-import type { Me, MessageVisibility, Segment, TicketDetail } from '../api/types'
-import { Button, Card, ErrorText, StatusBadge } from '../components/ui'
-import { formatDate } from '../format'
+import type { Me, MessageVisibility, Segment, TicketDetail, TicketPriority } from '../api/types'
+import { Button, Card, ErrorText, PriorityBadge, SlaBadge, StatusBadge } from '../components/ui'
+import { formatDate, priorities, priorityLabel } from '../format'
 
 export default function TicketPage() {
   const id = Number(useParams().id)
@@ -23,6 +23,7 @@ export default function TicketPage() {
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <span className="text-slate-500">#{ticket.id}</span>
           <StatusBadge status={ticket.status} />
+          {isAgentView && <PriorityBadge priority={ticket.priority} />}
           {isAgentView && <span className="text-sm text-slate-600">Turno de: {ticket.currentAreaName}</span>}
         </div>
         <h1 className="mb-2 text-2xl font-semibold">{ticket.title}</h1>
@@ -130,6 +131,7 @@ function Chain({ ticket, me }: { ticket: TicketDetail; me: Me }) {
             <span className="text-sm text-slate-500">
               {s.status === 'Open' ? (hasOpenChild(s) ? 'esperando a otra área' : 'trabajando') : 'resuelto'}
             </span>
+            {!(s.status === 'Open' && hasOpenChild(s)) && <SlaBadge sla={s.sla} />}
             {s.escalationReason && (
               <span className="w-full pl-4 text-sm text-slate-600">
                 {s.escalatedBy?.displayName} escaló: “{s.escalationReason}”
@@ -139,6 +141,8 @@ function Chain({ ticket, me }: { ticket: TicketDetail; me: Me }) {
           </li>
         ))}
       </ol>
+
+      {!finished && segments.some(isMine) && <TicketControls ticket={ticket} />}
 
       {actionable.map((s) => (
         <SegmentActions key={s.id} ticket={ticket} segment={s} />
@@ -219,6 +223,40 @@ function SegmentActions({ ticket, segment }: { ticket: TicketDetail; segment: Se
             Resolver mi parte
           </Button>
         </div>
+      )}
+      <ErrorText error={action.error} />
+    </div>
+  )
+}
+
+/** Priority (which sets the SLA targets) and pausing the clock while the requester owes an answer. */
+function TicketControls({ ticket }: { ticket: TicketDetail }) {
+  const action = useTicketAction(ticket.id)
+  const waiting = ticket.status === 'WaitingOnRequester'
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <label className="flex items-center gap-2">
+        <span className="font-medium">Prioridad</span>
+        <select
+          value={ticket.priority}
+          disabled={action.isPending}
+          onChange={(e) => action.mutate({ path: '/priority', body: { priority: e.target.value as TicketPriority } })}
+          className="rounded-lg border border-slate-300 px-3 py-2.5"
+        >
+          {priorities.map((p) => (
+            <option key={p} value={p}>
+              {priorityLabel(p)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {waiting ? (
+        <span className="text-sm text-slate-600">Esperando respuesta del solicitante: el SLA está en pausa.</span>
+      ) : (
+        <Button variant="secondary" disabled={action.isPending} onClick={() => action.mutate({ path: '/wait' })}>
+          Esperar respuesta del solicitante
+        </Button>
       )}
       <ErrorText error={action.error} />
     </div>

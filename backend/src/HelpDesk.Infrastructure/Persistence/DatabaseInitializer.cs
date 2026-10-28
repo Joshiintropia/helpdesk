@@ -1,4 +1,5 @@
 using HelpDesk.Domain.Sla;
+using HelpDesk.Domain.Tickets;
 using HelpDesk.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +34,18 @@ public class DatabaseInitializer(
         if (!await db.BusinessCalendars.AnyAsync(cancellationToken))
         {
             db.BusinessCalendars.Add(new BusinessCalendar { Name = "Horario laboral" });
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        if (!await db.SlaPolicies.AnyAsync(cancellationToken))
+        {
+            // Starting targets in business minutes (a 9-hour day); administrators adjust them in "SLA".
+            var calendarId = await db.BusinessCalendars.OrderBy(c => c.Id).Select(c => c.Id).FirstAsync(cancellationToken);
+            db.SlaPolicies.AddRange(
+                new SlaPolicy { Name = "Urgente", Priority = TicketPriority.Urgent, FirstResponseMinutes = 30, ResolutionMinutes = 4 * 60, CalendarId = calendarId },
+                new SlaPolicy { Name = "Alta", Priority = TicketPriority.High, FirstResponseMinutes = 2 * 60, ResolutionMinutes = 9 * 60, CalendarId = calendarId },
+                new SlaPolicy { Name = "Normal", Priority = TicketPriority.Normal, FirstResponseMinutes = 4 * 60, ResolutionMinutes = 3 * 9 * 60, CalendarId = calendarId },
+                new SlaPolicy { Name = "Baja", Priority = TicketPriority.Low, FirstResponseMinutes = 9 * 60, ResolutionMinutes = 5 * 9 * 60, CalendarId = calendarId });
             await db.SaveChangesAsync(cancellationToken);
         }
 

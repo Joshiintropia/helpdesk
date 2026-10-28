@@ -1,6 +1,7 @@
 using HelpDesk.Infrastructure.Email;
 using HelpDesk.Infrastructure.Identity;
 using HelpDesk.Infrastructure.Persistence;
+using HelpDesk.Infrastructure.Sla;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -18,10 +19,11 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<NotificationInterceptor>();
+        services.AddSingleton<SlaInterceptor>();
         services.AddDbContext<HelpDeskDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<NotificationInterceptor>()));
+            .AddInterceptors(sp.GetRequiredService<SlaInterceptor>(), sp.GetRequiredService<NotificationInterceptor>()));
 
         services
             .AddIdentityCore<ApplicationUser>(options =>

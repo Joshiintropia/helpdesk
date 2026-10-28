@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import MyRequestsPage from './pages/MyRequestsPage'
 import NewRequestPage from './pages/NewRequestPage'
 import QueuePage from './pages/QueuePage'
+import SlaPage from './pages/SlaPage'
 import TicketPage from './pages/TicketPage'
 import UsersPage from './pages/UsersPage'
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/bandeja" element={<QueuePage />} />
         <Route path="/admin/usuarios" element={<UsersPage />} />
         <Route path="/admin/areas" element={<AreasPage />} />
+        <Route path="/admin/sla" element={<SlaPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -62,6 +64,9 @@ function SignedIn() {
               </NavLink>
               <NavLink to="/admin/areas" className={link}>
                 Áreas
+              </NavLink>
+              <NavLink to="/admin/sla" className={link}>
+                SLA
               </NavLink>
             </>
           )}

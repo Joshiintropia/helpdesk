@@ -47,7 +47,8 @@ internal sealed class SlaConfiguration :
         builder.Property(p => p.Name).HasMaxLength(100).IsRequired();
         builder.HasOne<Area>().WithMany().HasForeignKey(p => p.AreaId);
         builder.HasOne<BusinessCalendar>().WithMany().HasForeignKey(p => p.CalendarId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(p => new { p.AreaId, p.Priority }).IsUnique();
+        // One general policy (no area) per priority, and at most one per area and priority.
+        builder.HasIndex(p => new { p.AreaId, p.Priority }).IsUnique().AreNullsDistinct(false);
     }
 
     public void Configure(EntityTypeBuilder<BusinessCalendar> builder)

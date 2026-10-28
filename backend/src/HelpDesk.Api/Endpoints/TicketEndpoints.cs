@@ -1,4 +1,5 @@
 using HelpDesk.Api.Auth;
+using HelpDesk.Domain.Sla;
 using HelpDesk.Domain.Tickets;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,8 @@ public static class TicketEndpoints
         tickets.MapPost("/{id:long}/escalate", Escalate);
         tickets.MapPost("/{id:long}/segments/{segmentId:guid}/resolve", ResolveSegment);
         tickets.MapPost("/{id:long}/resolve", ResolveAll);
+        tickets.MapPost("/{id:long}/priority", ChangePriority);
+        tickets.MapPost("/{id:long}/wait", WaitForRequester);
         return app;
     }
 
@@ -42,7 +45,7 @@ public static class TicketEndpoints
         var ticket = Ticket.Open(me.Id, request.AreaId, request.Description, request.Title, TicketPriority.Normal, clock.GetUtcNow());
         db.Tickets.Add(ticket);
         await db.SaveChangesAsync(ct);
-        return TypedResults.Created($"/api/tickets/{ticket.Id}", await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Created($"/api/tickets/{ticket.Id}", await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
     private static async Task<IResult> ListMine(CurrentUser me, HelpDeskDbContext db, CancellationToken ct)
@@ -57,7 +60,7 @@ public static class TicketEndpoints
         return TypedResults.Ok(items);
     }
 
-    private static async Task<IResult> Get(long id, CurrentUser me, HelpDeskDbContext db, CancellationToken ct)
+    private static async Task<IResult> Get(long id, CurrentUser me, HelpDeskDbContext db, TimeProvider clock, CancellationToken ct)
     {
         var ticket = await LoadAsync(db, id, ct);
         if (ticket is null || !await CanSeeAsync(ticket, me, ct))
@@ -65,7 +68,7 @@ public static class TicketEndpoints
             return TypedResults.NotFound();
         }
 
-        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
     private static async Task<IResult> AddMessage(
@@ -94,7 +97,7 @@ public static class TicketEndpoints
         }
 
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
     private static async Task<IResult> Reopen(long id, CurrentUser me, HelpDeskDbContext db, TimeProvider clock, CancellationToken ct)
@@ -107,11 +110,11 @@ public static class TicketEndpoints
 
         ticket.Reopen(me.Id, clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
-    /// <summary>Open segments for the caller's areas (or one area), oldest first: what each area has to work on.</summary>
-    private static async Task<IResult> Queue(CurrentUser me, HelpDeskDbContext db, int? areaId = null, CancellationToken ct = default)
+    /// <summary>Open segments for the caller's areas (or one area), most urgent SLA first: what each area has to work on.</summary>
+    private static async Task<IResult> Queue(CurrentUser me, HelpDeskDbContext db, TimeProvider clock, int? areaId = null, CancellationToken ct = default)
     {
         var areaIds = await me.AreaIdsAsync(ct);
         if (areaId is { } requested)
@@ -124,15 +127,24 @@ public static class TicketEndpoints
             areaIds = [requested];
         }
 
-        var items = await db.TicketSegments
+        var segments = await db.TicketSegments
+            .AsNoTracking()
+            .Include(s => s.Ticket)
             .Where(s => s.Status == SegmentStatus.Open && areaIds.Contains(s.AreaId))
             // A segment that escalated and is waiting for another area is not this area's turn.
             .Where(s => !db.TicketSegments.Any(child => child.ParentSegmentId == s.Id && child.Status == SegmentStatus.Open))
-            .OrderBy(s => s.OpenedAt)
+            .ToListAsync(ct);
+
+        var now = clock.GetUtcNow();
+        var items = segments
             .Select(s => new QueueItemDto(
                 s.TicketId, s.Ticket.Title, s.Ticket.Status, s.Ticket.Priority, s.Id, s.AreaId, s.AssigneeId,
-                s.EscalationReason, s.OpenedAt, s.Ticket.CreatedAt))
-            .ToListAsync(ct);
+                s.EscalationReason, s.OpenedAt, s.Ticket.CreatedAt, SlaDto.From(SlaStatus.For(s, s.Ticket, now))))
+            // Paused tickets wait on the requester, so they go after the ones the area can act on.
+            .OrderBy(i => i.Sla.State == SlaState.Paused ? 1 : 0)
+            .ThenBy(i => i.Sla.DueAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(i => i.OpenedAt)
+            .ToList();
         return TypedResults.Ok(items);
     }
 
@@ -158,7 +170,7 @@ public static class TicketEndpoints
 
         ticket.Escalate(request.SegmentId, request.ToAreaId, me.Id, request.Reason, clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
     private static async Task<IResult> ResolveSegment(
@@ -179,7 +191,7 @@ public static class TicketEndpoints
 
         ticket.ResolveSegment(segmentId, me.Id, request.Note, clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
     private static async Task<IResult> ResolveAll(
@@ -198,7 +210,46 @@ public static class TicketEndpoints
 
         ticket.ResolveAll(me.Id, request.Note, clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, ct));
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
+    }
+
+    /// <summary>Agents of any area involved can raise or lower the priority; the SLA due dates follow.</summary>
+    private static async Task<IResult> ChangePriority(
+        long id,
+        ChangePriorityRequest request,
+        CurrentUser me,
+        HelpDeskDbContext db,
+        TimeProvider clock,
+        CancellationToken ct)
+    {
+        var ticket = await LoadAsync(db, id, ct);
+        if (ticket is null || await ActingAreaAsync(ticket, me, ct) is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        ticket.ChangePriority(request.Priority, me.Id, clock.GetUtcNow());
+        await db.SaveChangesAsync(ct);
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
+    }
+
+    /// <summary>"Esperando respuesta": stops the SLA clock until the requester answers.</summary>
+    private static async Task<IResult> WaitForRequester(
+        long id,
+        CurrentUser me,
+        HelpDeskDbContext db,
+        TimeProvider clock,
+        CancellationToken ct)
+    {
+        var ticket = await LoadAsync(db, id, ct);
+        if (ticket is null || await ActingAreaAsync(ticket, me, ct) is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        ticket.WaitForRequester(me.Id, clock.GetUtcNow());
+        await db.SaveChangesAsync(ct);
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
 
     private static Task<Ticket?> LoadAsync(HelpDeskDbContext db, long id, CancellationToken ct) =>
@@ -231,8 +282,9 @@ public static class TicketEndpoints
             .FirstOrDefault();
     }
 
-    private static async Task<TicketDetailDto> ToDetailAsync(Ticket ticket, CurrentUser me, HelpDeskDbContext db, CancellationToken ct)
+    private static async Task<TicketDetailDto> ToDetailAsync(Ticket ticket, CurrentUser me, HelpDeskDbContext db, TimeProvider clock, CancellationToken ct)
     {
+        var now = clock.GetUtcNow();
         var isAgent = await ActingAreaAsync(ticket, me, ct) is not null;
         var viewerAreas = isAgent ? await me.AreaIdsAsync(ct) : [];
 
@@ -256,7 +308,8 @@ public static class TicketEndpoints
         var segments = isAgent
             ? ticket.Segments.OrderBy(s => s.OpenedAt).Select(s => new SegmentDto(
                 s.Id, s.AreaId, areaNames.GetValueOrDefault(s.AreaId, ""), s.ParentSegmentId, s.Status, s.EscalationReason,
-                MaybePerson(s.EscalatedById), MaybePerson(s.AssigneeId), s.OpenedAt, s.ResolvedAt, s.ResolutionNote)).ToList()
+                MaybePerson(s.EscalatedById), MaybePerson(s.AssigneeId), s.OpenedAt, s.ResolvedAt, s.ResolutionNote,
+                s.FirstRespondedAt, s.FirstResponseDueAt, s.ResolutionDueAt, SlaDto.From(SlaStatus.For(s, ticket, now)))).ToList()
             : null;
 
         return new TicketDetailDto(
