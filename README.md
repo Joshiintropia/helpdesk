@@ -25,6 +25,15 @@ docker compose up -d --build
 
 Abre `http://localhost:8080` y entra con `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Las migraciones se aplican solas al arrancar.
 
+## Acceso
+
+Hay dos formas de entrar y pueden convivir:
+
+- **Cuentas creadas por un administrador** (siempre disponibles). En *Usuarios* el administrador da de alta a la persona con su correo, le asigna áreas y permisos, y recibe una contraseña temporal para compartirla. Al entrar por primera vez, la persona elige su propia contraseña. Desde ahí mismo se puede desactivar una cuenta o generar otra contraseña temporal.
+- **Microsoft 365** (opcional). Con `MICROSOFT_LOGIN_ENABLED=true` aparece el botón "Entrar con Microsoft 365". Si ya existe un usuario con ese correo, se vincula a su cuenta y conserva sus áreas y permisos. Si no existe, se crea como solicitante (`MICROSOFT_AUTO_PROVISION=true`) o se le niega el acceso hasta que un administrador lo dé de alta (`false`).
+
+Para Microsoft 365, registra una aplicación en Entra ID (cuenta de tu organización únicamente) con la URL de respuesta `https://TU-DOMINIO/api/auth/signin-microsoft` y un secreto de cliente, y llena las variables `MICROSOFT_*` de `.env`. El tenant debe ser el de tu organización; `common` y `organizations` se rechazan porque las cuentas se emparejan por correo.
+
 ## Desarrollo local
 
 Requisitos: .NET SDK 10, Node 22 y un PostgreSQL local con un usuario `helpdesk` / `helpdesk` que pueda crear bases de datos.
@@ -78,10 +87,9 @@ frontend/                      Portal del solicitante y bandeja de agentes
 
 ## Próximos pasos
 
-1. Inicio de sesión con Office 365 / Entra ID (además de usuario y contraseña).
-2. Tickets por correo (Microsoft Graph e IMAP) y notificaciones.
-3. Cálculo de SLA por tramo con horario laboral y días festivos.
-4. Dashboard de métricas.
+1. Tickets por correo (Microsoft Graph e IMAP) y notificaciones.
+2. Cálculo de SLA por tramo con horario laboral y días festivos.
+3. Dashboard de métricas.
 
 ## Licencia
 

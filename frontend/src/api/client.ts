@@ -41,4 +41,5 @@ async function errorMessage(response: Response): Promise<string> {
 export const api = {
   get: <T>(url: string) => request<T>('GET', url),
   post: <T>(url: string, body?: unknown) => request<T>('POST', url, body ?? {}),
+  put: <T>(url: string, body: unknown) => request<T>('PUT', url, body),
 }

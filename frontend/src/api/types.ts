@@ -16,8 +16,32 @@ export interface Me {
   id: string
   email: string
   displayName: string
+  /** True while the user still has the temporary password an administrator gave them. */
+  mustChangePassword: boolean
   roles: string[]
   areas: Area[]
+}
+
+export interface AuthProviders {
+  microsoft: boolean
+}
+
+export type AssignableRole = 'Admin' | 'Supervisor'
+
+export interface UserAdmin {
+  id: string
+  email: string
+  displayName: string
+  isActive: boolean
+  mustChangePassword: boolean
+  microsoftLinked: boolean
+  roles: string[]
+  areaIds: number[]
+}
+
+export interface UserWithPassword {
+  user: UserAdmin
+  temporaryPassword: string
 }
 
 export interface Person {

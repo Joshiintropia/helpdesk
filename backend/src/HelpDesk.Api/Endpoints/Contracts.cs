@@ -6,9 +6,17 @@ public record AreaDto(int Id, string Name, string? Description, bool AcceptsRequ
 
 public record CreateAreaRequest(string Name, string? Description, bool AcceptsRequests = true);
 
+public record UpdateAreaRequest(string Name, string? Description, bool AcceptsRequests);
+
 public record AddAreaMemberRequest(string Email, bool IsLead = false);
 
-public record MeDto(Guid Id, string Email, string DisplayName, IReadOnlyCollection<string> Roles, IReadOnlyCollection<AreaDto> Areas);
+public record MeDto(
+    Guid Id,
+    string Email,
+    string DisplayName,
+    bool MustChangePassword,
+    IReadOnlyCollection<string> Roles,
+    IReadOnlyCollection<AreaDto> Areas);
 
 public record CreateTicketRequest(int AreaId, string Description, string? Title);
 
