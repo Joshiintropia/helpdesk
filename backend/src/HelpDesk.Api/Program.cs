@@ -108,6 +108,7 @@ app.MapUserAdminEndpoints();
 app.MapAreaEndpoints();
 app.MapTicketEndpoints();
 app.MapSlaEndpoints();
+app.MapMetricsEndpoints();
 
 app.Run();
 

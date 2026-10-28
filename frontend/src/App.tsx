@@ -2,6 +2,7 @@ import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router'
 import { useLogout, useMe } from './api/hooks'
 import AreasPage from './pages/AreasPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
+import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import MyRequestsPage from './pages/MyRequestsPage'
 import NewRequestPage from './pages/NewRequestPage'
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/mis-solicitudes" element={<MyRequestsPage />} />
         <Route path="/solicitudes/:id" element={<TicketPage />} />
         <Route path="/bandeja" element={<QueuePage />} />
+        <Route path="/metricas" element={<DashboardPage />} />
         <Route path="/admin/usuarios" element={<UsersPage />} />
         <Route path="/admin/areas" element={<AreasPage />} />
         <Route path="/admin/sla" element={<SlaPage />} />
@@ -53,9 +55,14 @@ function SignedIn() {
             Mis solicitudes
           </NavLink>
           {isAgent && !me.mustChangePassword && (
-            <NavLink to="/bandeja" className={link}>
-              Bandeja
-            </NavLink>
+            <>
+              <NavLink to="/bandeja" className={link}>
+                Bandeja
+              </NavLink>
+              <NavLink to="/metricas" className={link}>
+                Métricas
+              </NavLink>
+            </>
           )}
           {isAdmin && !me.mustChangePassword && (
             <>

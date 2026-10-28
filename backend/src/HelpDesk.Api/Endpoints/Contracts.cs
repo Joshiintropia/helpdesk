@@ -126,3 +126,40 @@ public record SlaPolicyDto(int Id, int? AreaId, TicketPriority Priority, int Fir
 public record SaveSlaPolicyRequest(int? AreaId, TicketPriority Priority, int FirstResponseMinutes, int ResolutionMinutes);
 
 public record SlaSettingsDto(CalendarDto Calendar, IReadOnlyCollection<SlaPolicyDto> Policies);
+
+/// <summary>Met and decided counts rather than percentages, so the screen can say "18 de 20" and avoid 0 of 0.</summary>
+public record SlaComplianceDto(
+    int FirstResponseMet,
+    int FirstResponseTotal,
+    int ResolutionMet,
+    int ResolutionTotal,
+    int? MedianFirstResponseMinutes,
+    int? MedianResolutionMinutes);
+
+public record MetricsTotalsDto(int Received, int Resolved, int Open, int Overdue, SlaComplianceDto Sla);
+
+public record DailyCountDto(DateOnly Date, int Received, int Resolved);
+
+/// <summary>Open segments of an area by where they stand against their SLA.</summary>
+public record BacklogDto(int OnTrack, int AtRisk, int Breached, int Paused, int NoSla);
+
+public record AreaMetricsDto(
+    int AreaId,
+    string Name,
+    int Received,
+    int Resolved,
+    int Open,
+    int EscalatedOut,
+    SlaComplianceDto Sla,
+    BacklogDto Backlog);
+
+public record EscalationFlowDto(int FromAreaId, string FromName, int ToAreaId, string ToName, int Count);
+
+public record MetricsDto(
+    DateOnly From,
+    DateOnly To,
+    string TimeZone,
+    MetricsTotalsDto Totals,
+    IReadOnlyCollection<DailyCountDto> Daily,
+    IReadOnlyCollection<AreaMetricsDto> Areas,
+    IReadOnlyCollection<EscalationFlowDto> Escalations);
