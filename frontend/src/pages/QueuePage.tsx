@@ -1,9 +1,9 @@
 import { Link } from 'react-router'
 import { useMe, useQueue } from '../api/hooks'
-import { ErrorText, StatusBadge } from '../components/ui'
+import { ErrorText, PriorityBadge, SlaBadge, StatusBadge } from '../components/ui'
 import { formatDate } from '../format'
 
-/** What each of my areas has to work on now, oldest first. Escalated items show why they arrived. */
+/** What each of my areas has to work on now, the closest SLA first. Escalated items show why they arrived. */
 export default function QueuePage() {
   const { data: me } = useMe()
   const { data: items, isLoading, error } = useQueue()
@@ -25,7 +25,11 @@ export default function QueuePage() {
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-slate-500">#{item.ticketId}</span>
                 <span className="flex-1 font-medium">{item.title}</span>
+                <PriorityBadge priority={item.priority} />
                 <StatusBadge status={item.status} />
+              </div>
+              <div className="mt-2">
+                <SlaBadge sla={item.sla} />
               </div>
               <div className="mt-2 text-sm text-slate-600">
                 {areaName(item.areaId)} · en esta área desde {formatDate(item.openedAt)}

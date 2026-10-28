@@ -36,6 +36,9 @@ public class Ticket
     public DateTimeOffset? ResolvedAt { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
+    /// <summary>Set while the SLA clock is stopped (waiting on the requester, or resolved).</summary>
+    public DateTimeOffset? SlaPausedAt { get; private set; }
+
     public IReadOnlyCollection<TicketSegment> Segments => _segments;
     public IReadOnlyCollection<TicketMessage> Messages => _messages;
     public IReadOnlyCollection<TicketEvent> Events => _events;
@@ -92,6 +95,7 @@ public class Ticket
             throw new DomainException("Explica por qué escalas el ticket para que la otra área tenga contexto.");
         }
 
+        from.MarkResponded(now);
         var segment = TicketSegment.Start(this, toAreaId, from, actorId, reason.Trim(), now);
         _segments.Add(segment);
         CurrentAreaId = toAreaId;
@@ -249,6 +253,10 @@ public class Ticket
         var message = TicketMessage.Create(this, agentId, agentAreaId, body, visibility, MessageSource.Portal, now);
         _messages.Add(message);
         Record(TicketEventType.Commented, agentId, now, areaId: agentAreaId);
+        foreach (var segment in _segments.Where(s => s.Status == SegmentStatus.Open && s.AreaId == agentAreaId))
+        {
+            segment.MarkResponded(now);
+        }
 
         if (visibility == MessageVisibility.Public)
         {
@@ -298,6 +306,12 @@ public class Ticket
 
         var previous = Status;
         Status = status;
+        SlaPausedAt = status switch
+        {
+            TicketStatus.WaitingOnRequester or TicketStatus.Resolved => SlaPausedAt ?? now,
+            TicketStatus.Closed => SlaPausedAt,
+            _ => null,
+        };
         Record(TicketEventType.StatusChanged, actorId, now, previous.ToString(), status.ToString());
     }
 

@@ -107,6 +107,7 @@ app.MapAccountEndpoints();
 app.MapUserAdminEndpoints();
 app.MapAreaEndpoints();
 app.MapTicketEndpoints();
+app.MapSlaEndpoints();
 
 app.Run();
 

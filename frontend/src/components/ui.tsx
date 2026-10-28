@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import type { TicketStatus } from '../api/types'
+import type { Sla, SlaState, TicketPriority, TicketStatus } from '../api/types'
+import { formatDate, formatRelative, priorityLabel } from '../format'
 
 // Words a requester understands; never "issue", "workflow" or "segment".
 const statusLabels: Record<TicketStatus, string> = {
@@ -52,5 +53,39 @@ export function ErrorText({ error }: { error: unknown }) {
     <p role="alert" className="text-sm text-red-700">
       {message}
     </p>
+  )
+}
+
+export function PriorityBadge({ priority }: { priority: TicketPriority }) {
+  if (priority === 'Normal') return null
+  const look = priority === 'Urgent' ? 'bg-red-600 text-white' : priority === 'High' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600'
+  return <span className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${look}`}>{priorityLabel(priority)}</span>
+}
+
+const slaStyles: Record<SlaState, string> = {
+  None: '',
+  OnTrack: 'bg-emerald-100 text-emerald-800',
+  AtRisk: 'bg-amber-100 text-amber-900',
+  Breached: 'bg-red-100 text-red-800',
+  Paused: 'bg-slate-100 text-slate-600',
+  Met: 'bg-emerald-100 text-emerald-800',
+}
+
+/** The SLA traffic light: what is due next, and when, in words. */
+export function SlaBadge({ sla }: { sla: Sla }) {
+  if (sla.state === 'None' || !sla.dueAt) return null
+  const what = sla.target === 'FirstResponse' ? 'Primera respuesta' : 'Resolución'
+  const text =
+    sla.state === 'Met'
+      ? 'SLA cumplido'
+      : sla.state === 'Paused'
+        ? 'SLA en pausa'
+        : sla.state === 'Breached'
+          ? `${what} vencida ${formatRelative(sla.dueAt)}`
+          : `${what} vence ${formatRelative(sla.dueAt)}`
+  return (
+    <span title={`Vence: ${formatDate(sla.dueAt)}`} className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${slaStyles[sla.state]}`}>
+      {text}
+    </span>
   )
 }

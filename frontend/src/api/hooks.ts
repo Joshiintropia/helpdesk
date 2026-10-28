@@ -1,6 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from './client'
-import type { Area, AssignableRole, AuthProviders, Me, QueueItem, TicketDetail, TicketSummary, UserAdmin, UserWithPassword } from './types'
+import type {
+  Area,
+  AssignableRole,
+  AuthProviders,
+  DayOfWeek,
+  Me,
+  QueueItem,
+  SlaSettings,
+  TicketDetail,
+  TicketPriority,
+  TicketSummary,
+  UserAdmin,
+  UserWithPassword,
+} from './types'
 
 export function useMe() {
   return useQuery({
@@ -142,3 +155,36 @@ export function useTicketAction(id: number) {
     },
   })
 }
+
+export function useSlaSettings() {
+  return useQuery({ queryKey: ['sla'], queryFn: () => api.get<SlaSettings>('/api/sla') })
+}
+
+export interface CalendarInput {
+  timeZone: string
+  workdayStart: string
+  workdayEnd: string
+  workingDays: DayOfWeek[]
+}
+
+export interface SlaPolicyInput {
+  areaId: number | null
+  priority: TicketPriority
+  firstResponseMinutes: number
+  resolutionMinutes: number
+}
+
+/** Every SLA change answers with the full settings, which replace the cached ones. */
+function useSlaMutation<TInput>(send: (input: TInput) => Promise<SlaSettings>) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: send, onSuccess: (settings) => client.setQueryData(['sla'], settings) })
+}
+
+export const useSaveCalendar = () => useSlaMutation((input: CalendarInput) => api.put<SlaSettings>('/api/sla/calendar', input))
+
+export const useAddHoliday = () =>
+  useSlaMutation((input: { date: string; name: string }) => api.post<SlaSettings>('/api/sla/calendar/holidays', input))
+
+export const useDeleteHoliday = () => useSlaMutation((id: number) => api.delete<SlaSettings>(`/api/sla/calendar/holidays/${id}`))
+
+export const useSavePolicies = () => useSlaMutation((input: SlaPolicyInput[]) => api.put<SlaSettings>('/api/sla/policies', input))

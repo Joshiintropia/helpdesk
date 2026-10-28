@@ -241,6 +241,8 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_sla_policies_area_id_priority");
 
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("AreaId", "Priority"), false);
+
                     b.ToTable("sla_policies", (string)null);
                 });
 
@@ -291,6 +293,10 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
+
+                    b.Property<DateTimeOffset?>("SlaPausedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sla_paused_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -457,6 +463,14 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("escalation_reason");
 
+                    b.Property<DateTimeOffset?>("FirstRespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_responded_at");
+
+                    b.Property<DateTimeOffset?>("FirstResponseDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_response_due_at");
+
                     b.Property<DateTimeOffset>("OpenedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at");
@@ -464,6 +478,10 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ParentSegmentId")
                         .HasColumnType("uuid")
                         .HasColumnName("parent_segment_id");
+
+                    b.Property<DateTimeOffset?>("ResolutionDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolution_due_at");
 
                     b.Property<string>("ResolutionNote")
                         .HasMaxLength(4000)
@@ -473,6 +491,14 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
+
+                    b.Property<int>("SlaPausedMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("sla_paused_minutes");
+
+                    b.Property<int?>("SlaPolicyId")
+                        .HasColumnType("integer")
+                        .HasColumnName("sla_policy_id");
 
                     b.Property<string>("Status")
                         .IsRequired()

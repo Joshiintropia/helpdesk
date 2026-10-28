@@ -45,6 +45,17 @@ Con **Microsoft 365** usa `Graph` en ambos: registra una app en Entra ID con per
 
 Como en cualquier mesa de ayuda por correo, el remitente de un correo se puede falsificar: usa SPF, DKIM y DMARC en tu dominio, y deja `EMAIL_CREATE_UNKNOWN_SENDERS=false` si solo deben escribir personas que ya tienen cuenta.
 
+## Tiempos de atención (SLA)
+
+Cada área que trabaja un ticket (cada tramo) tiene su propio SLA, así se ve en qué parte de la cadena se atora:
+
+- **Primera respuesta** y **resolución**, según la prioridad del ticket. Al instalar se crean tiempos iniciales (Urgente 30 min / 4 h, Alta 2 h / 9 h, Normal 4 h / 27 h, Baja 9 h / 45 h) que el administrador ajusta en *SLA*, con tiempos generales o propios por área.
+- Solo cuentan las **horas hábiles** del horario laboral (por defecto lunes a viernes de 9:00 a 18:00, hora de Ciudad de México) y no cuentan los **días festivos** registrados.
+- El reloj **se detiene** mientras se espera respuesta del solicitante y mientras el ticket está resuelto. Para el área que escaló, también se detiene mientras la otra área trabaja.
+- La bandeja muestra primero lo más próximo a vencer, con un semáforo: a tiempo, por vencer (queda menos de una cuarta parte), vencido o en pausa.
+
+Cambiar los tiempos aplica a los tramos nuevos y a los tickets que cambian de prioridad; los vencimientos ya calculados se respetan.
+
 ## Desarrollo local
 
 Requisitos: .NET SDK 10, Node 22 y un PostgreSQL local con un usuario `helpdesk` / `helpdesk` que pueda crear bases de datos.
@@ -100,9 +111,8 @@ frontend/                      Portal del solicitante y bandeja de agentes
 
 ## Próximos pasos
 
-1. Cálculo de SLA por tramo con horario laboral y días festivos.
-2. Dashboard de métricas.
-3. Adjuntos, encuesta de satisfacción y cierre automático de tickets resueltos.
+1. Dashboard de métricas.
+2. Adjuntos, encuesta de satisfacción y cierre automático de tickets resueltos.
 
 ## Licencia
 

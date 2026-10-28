@@ -4,6 +4,16 @@ export type TicketStatus = 'New' | 'InProgress' | 'WaitingOnRequester' | 'Resolv
 export type TicketPriority = 'Low' | 'Normal' | 'High' | 'Urgent'
 export type SegmentStatus = 'Open' | 'Resolved'
 export type MessageVisibility = 'Public' | 'InternalAllAreas' | 'InternalOwnArea'
+export type SlaState = 'None' | 'OnTrack' | 'AtRisk' | 'Breached' | 'Paused' | 'Met'
+export type SlaTarget = 'FirstResponse' | 'Resolution'
+export type DayOfWeek = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'
+
+/** Where a segment stands against its SLA: which target counts now and when it is due. */
+export interface Sla {
+  state: SlaState
+  target: SlaTarget | null
+  dueAt: string | null
+}
 
 export interface Area {
   id: number
@@ -72,6 +82,10 @@ export interface Segment {
   openedAt: string
   resolvedAt: string | null
   resolutionNote: string | null
+  firstRespondedAt: string | null
+  firstResponseDueAt: string | null
+  resolutionDueAt: string | null
+  sla: Sla
 }
 
 export interface Message {
@@ -112,4 +126,36 @@ export interface QueueItem {
   escalationReason: string | null
   openedAt: string
   ticketCreatedAt: string
+  sla: Sla
+}
+
+export interface Holiday {
+  id: number
+  date: string
+  name: string
+}
+
+export interface BusinessCalendar {
+  id: number
+  name: string
+  timeZone: string
+  /** "HH:mm:ss" */
+  workdayStart: string
+  workdayEnd: string
+  workingDays: DayOfWeek[]
+  holidays: Holiday[]
+}
+
+/** Targets in business minutes; areaId null is the general policy for that priority. */
+export interface SlaPolicy {
+  id: number
+  areaId: number | null
+  priority: TicketPriority
+  firstResponseMinutes: number
+  resolutionMinutes: number
+}
+
+export interface SlaSettings {
+  calendar: BusinessCalendar
+  policies: SlaPolicy[]
 }
