@@ -34,6 +34,17 @@ Hay dos formas de entrar y pueden convivir:
 
 Para Microsoft 365, registra una aplicación en Entra ID (cuenta de tu organización únicamente) con la URL de respuesta `https://TU-DOMINIO/api/auth/signin-microsoft` y un secreto de cliente, y llena las variables `MICROSOFT_*` de `.env`. El tenant debe ser el de tu organización; `common` y `organizations` se rechazan porque las cuentas se emparejan por correo.
 
+## Correo
+
+El buzón de ayuda (por ejemplo `ayuda@tuempresa.com`) puede crear tickets y la aplicación avisa al solicitante por correo. Leer y enviar se configuran por separado en `.env`:
+
+- **Leer el buzón** (`EMAIL_INBOUND_PROVIDER`): cada correo nuevo abre un ticket en el área de `EMAIL_DEFAULT_AREA_ID` (o la primera que acepta solicitudes). Si el asunto trae el folio `[#123]` y quien escribe es el solicitante o alguien de un área del ticket, se agrega como mensaje a ese ticket, sin la parte citada; si estaba resuelto, se reabre. Se ignoran respuestas automáticas, correos del propio buzón y duplicados.
+- **Enviar avisos** (`EMAIL_OUTBOUND_PROVIDER`): "Recibimos tu solicitud", cada respuesta pública de un agente y "Tu solicitud quedó resuelta". Las notas internas nunca salen. Los avisos se guardan primero en la base (`email_notifications`) y se envían en segundo plano con reintentos, así que una caída del servidor de correo no frena a nadie.
+
+Con **Microsoft 365** usa `Graph` en ambos: registra una app en Entra ID con permisos de *aplicación* `Mail.ReadWrite` y `Mail.Send`, da consentimiento de administrador y llena `GRAPH_*`. Conviene limitar la app solo al buzón de ayuda con una [Application Access Policy](https://learn.microsoft.com/graph/auth-limit-mailbox-access) o RBAC de Exchange. Sin Microsoft 365, usa `Imap` y `Smtp` con cualquier servidor.
+
+Como en cualquier mesa de ayuda por correo, el remitente de un correo se puede falsificar: usa SPF, DKIM y DMARC en tu dominio, y deja `EMAIL_CREATE_UNKNOWN_SENDERS=false` si solo deben escribir personas que ya tienen cuenta.
+
 ## Desarrollo local
 
 Requisitos: .NET SDK 10, Node 22 y un PostgreSQL local con un usuario `helpdesk` / `helpdesk` que pueda crear bases de datos.
@@ -83,13 +94,15 @@ frontend/                      Portal del solicitante y bandeja de agentes
 - `ticket_segments`: los tramos; uno por área que trabaja en el ticket, enlazados con `parent_segment_id`.
 - `ticket_messages`: la conversación, con notas internas para todas las áreas o solo para la propia.
 - `ticket_events`: bitácora de cada cambio; de aquí salen las métricas y la auditoría.
+- `processed_emails`: cada correo leído del buzón y qué se hizo con él.
+- `email_notifications`: avisos por enviar y enviados, con sus errores.
 - `areas`, `area_members`, `categories`, `sla_policies`, `business_calendars`, `holidays`, y las tablas de usuarios y roles.
 
 ## Próximos pasos
 
-1. Tickets por correo (Microsoft Graph e IMAP) y notificaciones.
-2. Cálculo de SLA por tramo con horario laboral y días festivos.
-3. Dashboard de métricas.
+1. Cálculo de SLA por tramo con horario laboral y días festivos.
+2. Dashboard de métricas.
+3. Adjuntos, encuesta de satisfacción y cierre automático de tickets resueltos.
 
 ## Licencia
 

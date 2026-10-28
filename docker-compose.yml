@@ -33,6 +33,25 @@ services:
       Auth__Microsoft__ClientId: ${MICROSOFT_CLIENT_ID:-}
       Auth__Microsoft__ClientSecret: ${MICROSOFT_CLIENT_SECRET:-}
       Auth__Microsoft__AutoProvision: ${MICROSOFT_AUTO_PROVISION:-true}
+      Email__AppUrl: ${APP_URL:-http://localhost:8080}
+      Email__Inbound__Provider: ${EMAIL_INBOUND_PROVIDER:-None}
+      Email__Inbound__DefaultAreaId: ${EMAIL_DEFAULT_AREA_ID:-}
+      Email__Inbound__CreateUnknownSenders: ${EMAIL_CREATE_UNKNOWN_SENDERS:-true}
+      Email__Inbound__Imap__Host: ${IMAP_HOST:-}
+      Email__Inbound__Imap__Port: ${IMAP_PORT:-993}
+      Email__Inbound__Imap__Username: ${IMAP_USERNAME:-}
+      Email__Inbound__Imap__Password: ${IMAP_PASSWORD:-}
+      Email__Outbound__Provider: ${EMAIL_OUTBOUND_PROVIDER:-None}
+      Email__Outbound__FromAddress: ${EMAIL_FROM_ADDRESS:-}
+      Email__Outbound__FromName: ${EMAIL_FROM_NAME:-Mesa de ayuda}
+      Email__Outbound__Smtp__Host: ${SMTP_HOST:-}
+      Email__Outbound__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Outbound__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Outbound__Smtp__Password: ${SMTP_PASSWORD:-}
+      Email__Graph__TenantId: ${GRAPH_TENANT_ID:-}
+      Email__Graph__ClientId: ${GRAPH_CLIENT_ID:-}
+      Email__Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
+      Email__Graph__Mailbox: ${GRAPH_MAILBOX:-}
 
   web:
     build: ./frontend
