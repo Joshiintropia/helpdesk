@@ -6,6 +6,7 @@ import type {
   AuthProviders,
   DayOfWeek,
   Me,
+  Metrics,
   QueueItem,
   SlaSettings,
   TicketDetail,
@@ -188,3 +189,13 @@ export const useAddHoliday = () =>
 export const useDeleteHoliday = () => useSlaMutation((id: number) => api.delete<SlaSettings>(`/api/sla/calendar/holidays/${id}`))
 
 export const useSavePolicies = () => useSlaMutation((input: SlaPolicyInput[]) => api.put<SlaSettings>('/api/sla/policies', input))
+
+export function useMetrics(days: number, areaId: number | null) {
+  return useQuery({
+    queryKey: ['metrics', days, areaId],
+    queryFn: () => api.get<Metrics>(`/api/metrics?days=${days}${areaId ? `&areaId=${areaId}` : ''}`),
+    // Refetch keeps the frame: the previous numbers stay (dimmed) while the new slice loads.
+    placeholderData: (previous) => previous,
+    refetchInterval: 60_000,
+  })
+}

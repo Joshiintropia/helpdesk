@@ -159,3 +159,42 @@ export interface SlaSettings {
   calendar: BusinessCalendar
   policies: SlaPolicy[]
 }
+
+/** Met and decided counts, so the screen can say "18 de 20" and avoid 0 of 0. */
+export interface SlaCompliance {
+  firstResponseMet: number
+  firstResponseTotal: number
+  resolutionMet: number
+  resolutionTotal: number
+  medianFirstResponseMinutes: number | null
+  medianResolutionMinutes: number | null
+}
+
+export interface Backlog {
+  onTrack: number
+  atRisk: number
+  breached: number
+  paused: number
+  noSla: number
+}
+
+export interface AreaMetrics {
+  areaId: number
+  name: string
+  received: number
+  resolved: number
+  open: number
+  escalatedOut: number
+  sla: SlaCompliance
+  backlog: Backlog
+}
+
+export interface Metrics {
+  from: string
+  to: string
+  timeZone: string
+  totals: { received: number; resolved: number; open: number; overdue: number; sla: SlaCompliance }
+  daily: { date: string; received: number; resolved: number }[]
+  areas: AreaMetrics[]
+  escalations: { fromAreaId: number; fromName: string; toAreaId: number; toName: string; count: number }[]
+}

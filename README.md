@@ -56,6 +56,15 @@ Cada área que trabaja un ticket (cada tramo) tiene su propio SLA, así se ve en
 
 Cambiar los tiempos aplica a los tramos nuevos y a los tickets que cambian de prioridad; los vencimientos ya calculados se respetan.
 
+## Métricas
+
+En *Métricas*, cada agente ve sus áreas y los supervisores y administradores ven todas, por periodo (7, 30 o 90 días) y por área:
+
+- Solicitudes recibidas, resueltas y abiertas, y cuántas tienen el SLA vencido.
+- Porcentaje de primera respuesta y de resolución a tiempo, y el tiempo típico (mediana) en horas hábiles.
+- Por área: pendientes según cómo van con su SLA, recibidas, resueltas, cuántas escaló y su cumplimiento.
+- Escalamientos: hacia dónde se mueven los tickets entre áreas.
+
 ## Desarrollo local
 
 Requisitos: .NET SDK 10, Node 22 y un PostgreSQL local con un usuario `helpdesk` / `helpdesk` que pueda crear bases de datos.
@@ -111,8 +120,7 @@ frontend/                      Portal del solicitante y bandeja de agentes
 
 ## Próximos pasos
 
-1. Dashboard de métricas.
-2. Adjuntos, encuesta de satisfacción y cierre automático de tickets resueltos.
+1. Adjuntos, encuesta de satisfacción y cierre automático de tickets resueltos.
 
 ## Licencia
 
