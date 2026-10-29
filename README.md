@@ -6,6 +6,8 @@ Mesa de ayuda open source pensada para que **cualquier persona, aunque no sea t�
 - **Para quien atiende:** una bandeja por área, notas internas y **escalamiento en cadena**: un mismo ticket puede pasar de Customer Happiness a Finanzas, de Finanzas a TI y de TI a Desarrollo. Cada área resuelve **su parte** (el ticket regresa a quien lo escaló) o **todo** (se cierra para toda la cadena).
 - **Para quien instala:** un solo `docker compose up`, una base PostgreSQL y nada más (sin Redis ni Elasticsearch).
 
+¿Es tu primera vez? El [manual de usuario](docs/manual-usuario.md) explica paso a paso cómo usarla, con pantallas.
+
 ## Stack
 
 | Capa | Tecnología |
