@@ -46,7 +46,10 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             registered.EnsureSuccessStatusCode();
         }
 
-        var login = await client.PostAsJsonAsync("/api/auth/login?useCookies=true", new { email, password = Password });
+        // Session cookies carry no Expires date. With a persistent cookie the client's cookie jar would drop it
+        // using the real clock once a test clock is set more than 10 hours in the past, and every call would get 401.
+        // The server still checks the session's expiry against the app's clock.
+        var login = await client.PostAsJsonAsync("/api/auth/login?useSessionCookies=true", new { email, password = Password });
         login.EnsureSuccessStatusCode();
         return client;
     }
