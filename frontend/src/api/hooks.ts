@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from './client'
 import type {
   Area,
+  Attachment,
   AssignableRole,
   AuthProviders,
   DayOfWeek,
@@ -9,6 +10,7 @@ import type {
   Metrics,
   QueueItem,
   SlaSettings,
+  Survey,
   TicketDetail,
   TicketPriority,
   TicketSummary,
@@ -139,7 +141,7 @@ export function useTicket(id: number) {
 export function useCreateTicket() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (input: { areaId: number; description: string }) => api.post<TicketDetail>('/api/tickets', input),
+    mutationFn: (input: { areaId: number; description: string; attachmentIds: string[] }) => api.post<TicketDetail>('/api/tickets', input),
     onSuccess: () => client.invalidateQueries({ queryKey: ['tickets'] }),
   })
 }
@@ -154,6 +156,23 @@ export function useTicketAction(id: number) {
       client.invalidateQueries({ queryKey: ['tickets', 'mine'] })
       client.invalidateQueries({ queryKey: ['tickets', 'queue'] })
     },
+  })
+}
+
+/** Uploads one file; it stays pending until it is sent with a request or a message. */
+export function useUpload() {
+  return useMutation({ mutationFn: (file: File) => api.upload<Attachment>('/api/attachments', file) })
+}
+
+export function useSurvey(token: string) {
+  return useQuery({ queryKey: ['survey', token], queryFn: () => api.get<Survey>(`/api/survey/${encodeURIComponent(token)}`), retry: false })
+}
+
+export function useAnswerSurvey(token: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { rating: number; comment: string | null }) => api.post<Survey>(`/api/survey/${encodeURIComponent(token)}`, input),
+    onSuccess: (survey) => client.setQueryData(['survey', token], survey),
   })
 }
 

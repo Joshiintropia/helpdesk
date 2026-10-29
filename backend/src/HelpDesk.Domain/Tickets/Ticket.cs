@@ -36,6 +36,12 @@ public class Ticket
     public DateTimeOffset? ResolvedAt { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
+    /// <summary>The requester's rating of how the request was handled, 1 (bad) to 5 (great).</summary>
+    public int? SatisfactionRating { get; private set; }
+
+    public string? SatisfactionComment { get; private set; }
+    public DateTimeOffset? RatedAt { get; private set; }
+
     /// <summary>Set while the SLA clock is stopped (waiting on the requester, or resolved).</summary>
     public DateTimeOffset? SlaPausedAt { get; private set; }
 
@@ -170,6 +176,28 @@ public class Ticket
 
         ClosedAt = now;
         MoveTo(TicketStatus.Closed, actorId, now);
+    }
+
+    /// <summary>
+    /// The satisfaction survey. Only after a resolution, and the requester may change their answer
+    /// until the ticket is closed. A low rating does not reopen the ticket; replying does.
+    /// </summary>
+    public void Rate(int rating, string? comment, DateTimeOffset now)
+    {
+        if (Status != TicketStatus.Resolved && !(Status == TicketStatus.Closed && RatedAt is null))
+        {
+            throw new DomainException("Podrás calificar la atención cuando tu solicitud esté resuelta.");
+        }
+
+        if (rating is < 1 or > 5)
+        {
+            throw new DomainException("Elige una calificación del 1 al 5.");
+        }
+
+        SatisfactionRating = rating;
+        SatisfactionComment = string.IsNullOrWhiteSpace(comment) ? null : Truncate(comment.Trim(), 2000);
+        RatedAt = now;
+        Record(TicketEventType.Rated, RequesterId, now, toValue: rating.ToString());
     }
 
     public void WaitForRequester(Guid actorId, DateTimeOffset now)

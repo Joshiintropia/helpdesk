@@ -54,4 +54,5 @@ public enum TicketEventType
     SegmentResolved,
     Reopened,
     Commented,
+    Rated,
 }

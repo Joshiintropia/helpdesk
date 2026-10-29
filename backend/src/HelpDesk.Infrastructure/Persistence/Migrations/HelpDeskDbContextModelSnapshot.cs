@@ -286,6 +286,10 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("priority");
 
+                    b.Property<DateTimeOffset?>("RatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rated_at");
+
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uuid")
                         .HasColumnName("requester_id");
@@ -293,6 +297,14 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ResolvedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("resolved_at");
+
+                    b.Property<string>("SatisfactionComment")
+                        .HasColumnType("text")
+                        .HasColumnName("satisfaction_comment");
+
+                    b.Property<int?>("SatisfactionRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("satisfaction_rating");
 
                     b.Property<DateTimeOffset?>("SlaPausedAt")
                         .HasColumnType("timestamp with time zone")
@@ -529,6 +541,69 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_ticket_segments_area_id_status");
 
                     b.ToTable("ticket_segments", (string)null);
+                });
+
+            modelBuilder.Entity("HelpDesk.Infrastructure.Attachments.TicketAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("file_name");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<long?>("TicketId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ticket_id");
+
+                    b.Property<Guid>("UploadedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticket_attachments");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_ticket_attachments_unlinked")
+                        .HasFilter("ticket_id IS NULL");
+
+                    b.HasIndex("MessageId")
+                        .HasDatabaseName("ix_ticket_attachments_message_id");
+
+                    b.HasIndex("TicketId")
+                        .HasDatabaseName("ix_ticket_attachments_ticket_id");
+
+                    b.HasIndex("UploadedById")
+                        .HasDatabaseName("ix_ticket_attachments_uploaded_by_id");
+
+                    b.ToTable("ticket_attachments", (string)null);
                 });
 
             modelBuilder.Entity("HelpDesk.Infrastructure.Email.EmailNotification", b =>
@@ -1039,6 +1114,30 @@ namespace HelpDesk.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_ticket_segments_tickets_ticket_id");
+
+                    b.Navigation("Ticket");
+                });
+
+            modelBuilder.Entity("HelpDesk.Infrastructure.Attachments.TicketAttachment", b =>
+                {
+                    b.HasOne("HelpDesk.Domain.Tickets.TicketMessage", null)
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_ticket_attachments_ticket_messages_message_id");
+
+                    b.HasOne("HelpDesk.Domain.Tickets.Ticket", "Ticket")
+                        .WithMany()
+                        .HasForeignKey("TicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_ticket_attachments_tickets_ticket_id");
+
+                    b.HasOne("HelpDesk.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticket_attachments_asp_net_users_uploaded_by_id");
 
                     b.Navigation("Ticket");
                 });

@@ -19,9 +19,19 @@ public record MeDto(
     IReadOnlyCollection<string> Roles,
     IReadOnlyCollection<AreaDto> Areas);
 
-public record CreateTicketRequest(int AreaId, string Description, string? Title);
+public record CreateTicketRequest(int AreaId, string Description, string? Title, IReadOnlyCollection<Guid>? AttachmentIds = null);
 
-public record AddMessageRequest(string Body, MessageVisibility Visibility = MessageVisibility.Public);
+public record AddMessageRequest(string? Body, MessageVisibility Visibility = MessageVisibility.Public, IReadOnlyCollection<Guid>? AttachmentIds = null);
+
+public record AttachmentDto(Guid Id, string FileName, string ContentType, long Size, bool IsImage);
+
+public record RateRequest(int Rating, string? Comment);
+
+/// <summary>The requester's rating, shown on the ticket.</summary>
+public record SatisfactionDto(int Rating, string? Comment, DateTimeOffset RatedAt);
+
+/// <summary>What the public survey page needs: no conversation, no people, only the ticket it rates.</summary>
+public record SurveyDto(long TicketId, string Title, TicketStatus Status, bool CanRate, int? Rating, string? Comment);
 
 public record EscalateRequest(Guid SegmentId, int ToAreaId, string Reason);
 
@@ -71,7 +81,8 @@ public record MessageDto(
     string Body,
     MessageVisibility Visibility,
     MessageSource Source,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyCollection<AttachmentDto> Attachments);
 
 /// <summary>
 /// A ticket as one viewer may see it. Requesters get no segments and no internal notes:
@@ -90,7 +101,9 @@ public record TicketDetailDto(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? ResolvedAt,
     IReadOnlyCollection<SegmentDto>? Segments,
-    IReadOnlyCollection<MessageDto> Messages);
+    IReadOnlyCollection<MessageDto> Messages,
+    IReadOnlyCollection<AttachmentDto> Attachments,
+    SatisfactionDto? Satisfaction);
 
 public record QueueItemDto(
     long TicketId,
@@ -136,7 +149,10 @@ public record SlaComplianceDto(
     int? MedianFirstResponseMinutes,
     int? MedianResolutionMinutes);
 
-public record MetricsTotalsDto(int Received, int Resolved, int Open, int Overdue, SlaComplianceDto Sla);
+public record MetricsTotalsDto(int Received, int Resolved, int Open, int Overdue, SlaComplianceDto Sla, SatisfactionSummaryDto Satisfaction);
+
+/// <summary>Survey answers given in the period. <c>ByRating[0]</c> counts one-star answers, <c>ByRating[4]</c> five stars.</summary>
+public record SatisfactionSummaryDto(int Responses, double? Average, IReadOnlyList<int> ByRating);
 
 public record DailyCountDto(DateOnly Date, int Received, int Resolved);
 
@@ -151,7 +167,8 @@ public record AreaMetricsDto(
     int Open,
     int EscalatedOut,
     SlaComplianceDto Sla,
-    BacklogDto Backlog);
+    BacklogDto Backlog,
+    SatisfactionSummaryDto Satisfaction);
 
 public record EscalationFlowDto(int FromAreaId, string FromName, int ToAreaId, string ToName, int Count);
 

@@ -1,6 +1,8 @@
 using HelpDesk.Api.Auth;
 using HelpDesk.Domain.Sla;
 using HelpDesk.Domain.Tickets;
+using HelpDesk.Infrastructure.Attachments;
+using HelpDesk.Infrastructure.Email;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +20,8 @@ public static class TicketEndpoints
         tickets.MapGet("/{id:long}", Get);
         tickets.MapPost("/{id:long}/messages", AddMessage);
         tickets.MapPost("/{id:long}/reopen", Reopen);
+        tickets.MapPost("/{id:long}/rate", Rate);
+        tickets.MapPost("/{id:long}/close", Close);
 
         // Agents
         tickets.MapGet("/queue", Queue);
@@ -33,6 +37,7 @@ public static class TicketEndpoints
         CreateTicketRequest request,
         CurrentUser me,
         HelpDeskDbContext db,
+        AttachmentService attachments,
         TimeProvider clock,
         CancellationToken ct)
     {
@@ -44,6 +49,7 @@ public static class TicketEndpoints
 
         var ticket = Ticket.Open(me.Id, request.AreaId, request.Description, request.Title, TicketPriority.Normal, clock.GetUtcNow());
         db.Tickets.Add(ticket);
+        await attachments.LinkAsync(request.AttachmentIds, me.Id, ticket, messageId: null, ct);
         await db.SaveChangesAsync(ct);
         return TypedResults.Created($"/api/tickets/{ticket.Id}", await ToDetailAsync(ticket, me, db, clock, ct));
     }
@@ -76,6 +82,7 @@ public static class TicketEndpoints
         AddMessageRequest request,
         CurrentUser me,
         HelpDeskDbContext db,
+        AttachmentService attachments,
         TimeProvider clock,
         CancellationToken ct)
     {
@@ -85,17 +92,32 @@ public static class TicketEndpoints
             return TypedResults.NotFound();
         }
 
+        // Files alone are a valid message; the text then just says so.
+        var body = string.IsNullOrWhiteSpace(request.Body) && request.AttachmentIds is { Count: > 0 }
+            ? EmailIngestionService.AttachmentsOnlyText
+            : request.Body ?? "";
+
         // An agent writing on their own request speaks as the requester.
         var now = clock.GetUtcNow();
-        if (ticket.RequesterId != me.Id && await ActingAreaAsync(ticket, me, ct) is { } areaId)
+        var message = ticket.RequesterId != me.Id && await ActingAreaAsync(ticket, me, ct) is { } areaId
+            ? ticket.AddAgentMessage(me.Id, areaId, body, request.Visibility, now)
+            : ticket.AddRequesterMessage(body, MessageSource.Portal, now);
+
+        await attachments.LinkAsync(request.AttachmentIds, me.Id, ticket, message.Id, ct);
+        await db.SaveChangesAsync(ct);
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
+    }
+
+    /// <summary>The requester rates the attention once the ticket is resolved.</summary>
+    private static async Task<IResult> Rate(long id, RateRequest request, CurrentUser me, HelpDeskDbContext db, TimeProvider clock, CancellationToken ct)
+    {
+        var ticket = await LoadAsync(db, id, ct);
+        if (ticket is null || ticket.RequesterId != me.Id)
         {
-            ticket.AddAgentMessage(me.Id, areaId, request.Body, request.Visibility, now);
-        }
-        else
-        {
-            ticket.AddRequesterMessage(request.Body, MessageSource.Portal, now);
+            return TypedResults.NotFound();
         }
 
+        ticket.Rate(request.Rating, request.Comment, clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
@@ -109,6 +131,20 @@ public static class TicketEndpoints
         }
 
         ticket.Reopen(me.Id, clock.GetUtcNow());
+        await db.SaveChangesAsync(ct);
+        return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
+    }
+
+    /// <summary>Closes a resolved ticket before the automatic close: the requester confirms, or an agent of the ticket.</summary>
+    private static async Task<IResult> Close(long id, CurrentUser me, HelpDeskDbContext db, TimeProvider clock, CancellationToken ct)
+    {
+        var ticket = await LoadAsync(db, id, ct);
+        if (ticket is null || !await CanSeeAsync(ticket, me, ct))
+        {
+            return TypedResults.NotFound();
+        }
+
+        ticket.Close(me.Id, clock.GetUtcNow());
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(await ToDetailAsync(ticket, me, db, clock, ct));
     }
@@ -289,6 +325,13 @@ public static class TicketEndpoints
         var viewerAreas = isAgent ? await me.AreaIdsAsync(ct) : [];
 
         var messages = ticket.Messages.Where(m => m.IsVisibleTo(viewerAreas)).OrderBy(m => m.CreatedAt).ToList();
+        var files = await db.TicketAttachments
+            .Where(a => a.TicketId == ticket.Id)
+            .OrderBy(a => a.CreatedAt)
+            .Select(a => new { a.MessageId, Dto = new AttachmentDto(a.Id, a.FileName, a.ContentType, a.Size, false) })
+            .ToListAsync(ct);
+        IReadOnlyCollection<AttachmentDto> FilesOf(Guid? messageId) =>
+            files.Where(f => f.MessageId == messageId).Select(f => f.Dto with { IsImage = AttachmentRules.IsImage(f.Dto.ContentType) }).ToList();
         var peopleIds = messages.Select(m => m.AuthorId)
             .Append(ticket.RequesterId)
             .Concat(ticket.Segments.Select(s => s.AssigneeId).OfType<Guid>())
@@ -325,6 +368,8 @@ public static class TicketEndpoints
             ticket.UpdatedAt,
             ticket.ResolvedAt,
             segments,
-            messages.Select(m => new MessageDto(m.Id, Person(m.AuthorId), m.AuthorAreaId, m.Body, m.Visibility, m.Source, m.CreatedAt)).ToList());
+            messages.Select(m => new MessageDto(m.Id, Person(m.AuthorId), m.AuthorAreaId, m.Body, m.Visibility, m.Source, m.CreatedAt, FilesOf(m.Id))).ToList(),
+            FilesOf(null),
+            ticket.SatisfactionRating is { } rating ? new SatisfactionDto(rating, ticket.SatisfactionComment, ticket.RatedAt!.Value) : null);
     }
 }

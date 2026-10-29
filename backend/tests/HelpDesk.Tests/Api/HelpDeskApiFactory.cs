@@ -20,6 +20,9 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Environment.GetEnvironmentVariable("HELPDESK_TEST_DB")
         ?? "Host=localhost;Port=5432;Username=helpdesk;Password=helpdesk";
 
+    /// <summary>Where this run keeps uploaded files; deleted with the database.</summary>
+    public string StoragePath { get; } = Path.Combine(Path.GetTempPath(), $"helpdesk_test_{Guid.NewGuid():N}");
+
     private string DatabaseConnection => new NpgsqlConnectionStringBuilder(ServerConnection) { Database = _database }.ConnectionString;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -29,6 +32,8 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Auth:AllowSelfRegistration", "true");
         builder.UseSetting("Seed:AdminEmail", AdminEmail);
         builder.UseSetting("Seed:AdminPassword", Password);
+        builder.UseSetting("Storage:Path", StoragePath);
+        builder.UseSetting("Tickets:RunWorkers", "false");
     }
 
     /// <summary>A client with its own cookie jar, already signed in.</summary>
@@ -57,5 +62,9 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await connection.OpenAsync();
         await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_database}\" WITH (FORCE)", connection);
         await drop.ExecuteNonQueryAsync();
+        if (Directory.Exists(StoragePath))
+        {
+            Directory.Delete(StoragePath, recursive: true);
+        }
     }
 }

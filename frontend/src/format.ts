@@ -25,3 +25,10 @@ export const priorities: TicketPriority[] = ['Urgent', 'High', 'Normal', 'Low']
 export function priorityLabel(priority: TicketPriority) {
   return { Low: 'Baja', Normal: 'Normal', High: 'Alta', Urgent: 'Urgente' }[priority]
 }
+
+/** 512 B, 84 KB, 2.4 MB */
+export function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}

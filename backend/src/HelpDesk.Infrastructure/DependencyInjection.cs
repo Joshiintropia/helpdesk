@@ -1,4 +1,6 @@
+using HelpDesk.Infrastructure.Attachments;
 using HelpDesk.Infrastructure.Email;
+using HelpDesk.Infrastructure.Maintenance;
 using HelpDesk.Infrastructure.Identity;
 using HelpDesk.Infrastructure.Persistence;
 using HelpDesk.Infrastructure.Sla;
@@ -45,6 +47,18 @@ public static class DependencyInjection
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<ExternalLoginService>();
         services.AddEmail(configuration);
+
+        services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.Section));
+        services.AddSingleton<AttachmentStore>();
+        services.AddScoped<AttachmentService>();
+
+        services.Configure<TicketOptions>(configuration.GetSection(TicketOptions.Section));
+        services.AddScoped<TicketMaintenance>();
+        if (configuration.GetSection(TicketOptions.Section).Get<TicketOptions>()?.RunWorkers ?? true)
+        {
+            services.AddHostedService<TicketMaintenanceWorker>();
+        }
+
         return services;
     }
 
@@ -58,6 +72,7 @@ public static class DependencyInjection
 
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.Section));
         services.AddScoped<EmailIngestionService>();
+        services.AddSingleton<SurveyLinks>();
         services.AddHttpClient<GraphMailClient>();
 
         switch (email.Inbound.Provider)

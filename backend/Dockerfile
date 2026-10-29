@@ -11,7 +11,11 @@ RUN dotnet publish src/HelpDesk.Api/HelpDesk.Api.csproj -c Release -o /app --no-
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
-ENV ASPNETCORE_HTTP_PORTS=8080
+# Attachments and data-protection keys live here; mount a volume so they survive updates.
+RUN mkdir -p /app/data && chown $APP_UID /app/data
+ENV ASPNETCORE_HTTP_PORTS=8080 \
+    Storage__Path=/app/data
 EXPOSE 8080
+VOLUME /app/data
 USER $APP_UID
 ENTRYPOINT ["dotnet", "HelpDesk.Api.dll"]

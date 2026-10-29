@@ -2,7 +2,10 @@ import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router'
 import { useAreas, useMe, useTicket, useTicketAction } from '../api/hooks'
 import type { Me, MessageVisibility, Segment, TicketDetail, TicketPriority } from '../api/types'
+import { AttachmentList, FilePicker } from '../components/attachments'
+import { RatingForm, Stars } from '../components/Rating'
 import { Button, Card, ErrorText, PriorityBadge, SlaBadge, StatusBadge } from '../components/ui'
+import { usePendingFiles } from '../components/usePendingFiles'
 import { formatDate, priorities, priorityLabel } from '../format'
 
 export default function TicketPage() {
@@ -28,18 +31,37 @@ export default function TicketPage() {
         </div>
         <h1 className="mb-2 text-2xl font-semibold">{ticket.title}</h1>
         {ticket.description !== ticket.title && <p className="whitespace-pre-wrap text-slate-700">{ticket.description}</p>}
+        <AttachmentList attachments={ticket.attachments} />
         <p className="mt-3 text-sm text-slate-500">
           {ticket.requester.displayName} · {formatDate(ticket.createdAt)}
         </p>
         {ticket.status === 'Resolved' && ticket.requester.id === me.id && (
           <div className="mt-4 rounded-lg bg-emerald-50 p-4">
-            <p className="mb-3 text-emerald-900">Marcamos tu solicitud como resuelta. ¿Quedó todo bien?</p>
-            <Button variant="secondary" onClick={() => action.mutate({ path: '/reopen' })} disabled={action.isPending}>
-              No, sigue pasando
+            <p className="mb-1 text-emerald-900">Marcamos tu solicitud como resuelta. ¿Quedó todo bien?</p>
+            <p className="mb-3 text-sm text-emerald-800">Si no nos escribes, se cerrará sola en unos días.</p>
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" onClick={() => action.mutate({ path: '/close' })} disabled={action.isPending}>
+                Sí, ya quedó
+              </Button>
+              <Button variant="secondary" onClick={() => action.mutate({ path: '/reopen' })} disabled={action.isPending}>
+                No, sigue pasando
+              </Button>
+            </div>
+            <ErrorText error={action.error} />
+          </div>
+        )}
+        {ticket.status === 'Resolved' && isAgentView && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 p-4">
+            <p className="flex-1 text-slate-700">Resuelta. Se cerrará sola si el solicitante no responde en unos días.</p>
+            <Button variant="secondary" onClick={() => action.mutate({ path: '/close' })} disabled={action.isPending}>
+              Cerrar ahora
             </Button>
+            <ErrorText error={action.error} />
           </div>
         )}
       </Card>
+
+      <SatisfactionCard ticket={ticket} isRequester={ticket.requester.id === me.id} />
 
       {isAgentView && <Chain ticket={ticket} me={me} />}
 
@@ -48,14 +70,53 @@ export default function TicketPage() {
   )
 }
 
+/** The survey: the requester rates once resolved (and may change it until closed); agents see the answer. */
+function SatisfactionCard({ ticket, isRequester }: { ticket: TicketDetail; isRequester: boolean }) {
+  const action = useTicketAction(ticket.id)
+  const { satisfaction } = ticket
+  const canRate = isRequester && (ticket.status === 'Resolved' || (ticket.status === 'Closed' && !satisfaction))
+
+  if (canRate) {
+    return (
+      <Card>
+        {satisfaction && <p className="mb-3 text-emerald-700">¡Gracias por tu calificación! Puedes cambiarla mientras la solicitud siga abierta.</p>}
+        <RatingForm
+          key={satisfaction?.ratedAt ?? 'new'}
+          initialRating={satisfaction?.rating}
+          initialComment={satisfaction?.comment}
+          pending={action.isPending}
+          error={action.error}
+          onSubmit={(rating, comment) => action.mutate({ path: '/rate', body: { rating, comment } })}
+        />
+      </Card>
+    )
+  }
+
+  if (!satisfaction) return null
+  return (
+    <Card>
+      <h2 className="mb-2 text-lg font-semibold">{isRequester ? 'Tu calificación' : 'Calificación del solicitante'}</h2>
+      <p className="text-2xl">
+        <Stars rating={satisfaction.rating} />
+      </p>
+      {satisfaction.comment && <p className="mt-2 whitespace-pre-wrap text-slate-700">“{satisfaction.comment}”</p>}
+      <p className="mt-2 text-sm text-slate-500">{formatDate(satisfaction.ratedAt)}</p>
+    </Card>
+  )
+}
+
 function Conversation({ ticket, isAgentView, finished }: { ticket: TicketDetail; isAgentView: boolean; finished: boolean }) {
   const action = useTicketAction(ticket.id)
   const [body, setBody] = useState('')
   const [visibility, setVisibility] = useState<MessageVisibility>('Public')
+  const files = usePendingFiles()
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    action.mutate({ path: '/messages', body: { body, visibility } }, { onSuccess: () => setBody('') })
+    action.mutate(
+      { path: '/messages', body: { body, visibility, attachmentIds: files.ids } },
+      { onSuccess: () => { setBody(''); files.clear() } },
+    )
   }
 
   return (
@@ -73,6 +134,7 @@ function Conversation({ ticket, isAgentView, finished }: { ticket: TicketDetail;
               {m.visibility !== 'Public' && <span className="ml-2 text-amber-800">Nota interna</span>}
             </div>
             <p className="whitespace-pre-wrap">{m.body}</p>
+            <AttachmentList attachments={m.attachments} />
           </li>
         ))}
       </ul>
@@ -85,6 +147,7 @@ function Conversation({ ticket, isAgentView, finished }: { ticket: TicketDetail;
             placeholder={finished && !isAgentView ? 'Si sigue pasando, escríbenos y la reabrimos.' : 'Escribe un mensaje…'}
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5"
           />
+          <FilePicker pending={files} />
           <div className="flex flex-wrap items-center gap-3">
             {isAgentView && (
               <select
@@ -97,7 +160,7 @@ function Conversation({ ticket, isAgentView, finished }: { ticket: TicketDetail;
                 <option value="InternalOwnArea">Nota interna (solo mi área)</option>
               </select>
             )}
-            <Button type="submit" disabled={action.isPending || !body.trim()}>
+            <Button type="submit" disabled={action.isPending || files.uploading || (!body.trim() && files.ids.length === 0)}>
               Enviar
             </Button>
           </div>

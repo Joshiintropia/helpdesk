@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using HelpDesk.Infrastructure.Attachments;
 using Microsoft.Extensions.Options;
 
 namespace HelpDesk.Infrastructure.Email;
@@ -24,7 +25,7 @@ public sealed class GraphMailClient(HttpClient http, IOptions<EmailOptions> opti
     {
         var url = $"{MailboxUrl}/mailFolders/inbox/messages"
             + "?$filter=isRead eq false&$orderby=receivedDateTime&$top=25"
-            + "&$select=id,internetMessageId,subject,from,body,receivedDateTime,internetMessageHeaders";
+            + "&$select=id,internetMessageId,subject,from,body,receivedDateTime,internetMessageHeaders,hasAttachments";
         using var request = await AuthorizedAsync(HttpMethod.Get, url, cancellationToken);
         request.Headers.Add("Prefer", "outlook.body-content-type=\"text\"");
 
@@ -33,9 +34,10 @@ public sealed class GraphMailClient(HttpClient http, IOptions<EmailOptions> opti
         var page = await response.Content.ReadFromJsonAsync<GraphPage>(cancellationToken)
             ?? throw new InvalidOperationException("Microsoft Graph devolvió una respuesta vacía.");
 
-        return page.Value
-            .Where(m => !string.IsNullOrWhiteSpace(m.From?.EmailAddress?.Address))
-            .Select(m => new InboundEmail(
+        var emails = new List<InboundEmail>();
+        foreach (var m in page.Value.Where(m => !string.IsNullOrWhiteSpace(m.From?.EmailAddress?.Address)))
+        {
+            emails.Add(new InboundEmail(
                 m.Id,
                 string.IsNullOrWhiteSpace(m.InternetMessageId) ? $"graph-{m.Id}" : m.InternetMessageId,
                 m.From!.EmailAddress!.Address!,
@@ -45,7 +47,23 @@ public sealed class GraphMailClient(HttpClient http, IOptions<EmailOptions> opti
                     ? ImapMailboxReader.HtmlToText(m.Body.Content)
                     : m.Body?.Content ?? "",
                 m.ReceivedDateTime ?? clock.GetUtcNow(),
-                IsAutoReply(m.InternetMessageHeaders)))
+                IsAutoReply(m.InternetMessageHeaders),
+                m.HasAttachments ? await AttachmentsAsync(m.Id, cancellationToken) : null));
+        }
+
+        return emails;
+    }
+
+    /// <summary>File attachments of one message; inline images and attached emails or links are skipped.</summary>
+    private async Task<IReadOnlyList<InboundFile>> AttachmentsAsync(string messageId, CancellationToken cancellationToken)
+    {
+        using var request = await AuthorizedAsync(HttpMethod.Get, $"{MailboxUrl}/messages/{Uri.EscapeDataString(messageId)}/attachments", cancellationToken);
+        using var response = await http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        var page = await response.Content.ReadFromJsonAsync<GraphAttachmentPage>(cancellationToken);
+        return (page?.Value ?? [])
+            .Where(a => a.ODataType == "#microsoft.graph.fileAttachment" && !a.IsInline && a.ContentBytes is not null)
+            .Select(a => new InboundFile(a.Name ?? "archivo", a.ContentType, Convert.FromBase64String(a.ContentBytes!)))
             .ToList();
     }
 
@@ -154,7 +172,17 @@ public sealed class GraphMailClient(HttpClient http, IOptions<EmailOptions> opti
         GraphRecipient? From,
         GraphBody? Body,
         DateTimeOffset? ReceivedDateTime,
-        List<GraphHeader>? InternetMessageHeaders);
+        List<GraphHeader>? InternetMessageHeaders,
+        bool HasAttachments = false);
+
+    private sealed record GraphAttachmentPage(List<GraphAttachment> Value);
+
+    private sealed record GraphAttachment(
+        [property: JsonPropertyName("@odata.type")] string? ODataType,
+        string? Name,
+        string? ContentType,
+        bool IsInline,
+        string? ContentBytes);
 
     private sealed record GraphRecipient(GraphAddress? EmailAddress);
 

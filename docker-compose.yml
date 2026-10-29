@@ -52,6 +52,10 @@ services:
       Email__Graph__ClientId: ${GRAPH_CLIENT_ID:-}
       Email__Graph__ClientSecret: ${GRAPH_CLIENT_SECRET:-}
       Email__Graph__Mailbox: ${GRAPH_MAILBOX:-}
+      Storage__MaxFileBytes: ${ATTACHMENT_MAX_BYTES:-10485760}
+      Tickets__AutoCloseBusinessDays: ${TICKETS_AUTO_CLOSE_DAYS:-3}
+    volumes:
+      - app-data:/app/data
 
   web:
     build: ./frontend
@@ -63,3 +67,4 @@ services:
 
 volumes:
   db-data:
+  app-data:

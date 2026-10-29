@@ -1,6 +1,7 @@
 using HelpDesk.Domain.Areas;
 using HelpDesk.Domain.Sla;
 using HelpDesk.Domain.Tickets;
+using HelpDesk.Infrastructure.Attachments;
 using HelpDesk.Infrastructure.Email;
 using HelpDesk.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -23,6 +24,7 @@ public class HelpDeskDbContext(DbContextOptions<HelpDeskDbContext> options)
     public DbSet<BusinessCalendar> BusinessCalendars => Set<BusinessCalendar>();
     public DbSet<ProcessedEmail> ProcessedEmails => Set<ProcessedEmail>();
     public DbSet<EmailNotification> EmailNotifications => Set<EmailNotification>();
+    public DbSet<TicketAttachment> TicketAttachments => Set<TicketAttachment>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -1,3 +1,4 @@
+using HelpDesk.Infrastructure.Attachments;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
@@ -37,7 +38,8 @@ public sealed class ImapMailboxReader(IOptions<EmailOptions> options) : IMailbox
                 message.Subject ?? "",
                 message.TextBody ?? HtmlToText(message.HtmlBody),
                 message.Date,
-                IsAutoReply(message)));
+                IsAutoReply(message),
+                await AttachmentsAsync(message, cancellationToken)));
         }
 
         await client.DisconnectAsync(true, cancellationToken);
@@ -50,6 +52,20 @@ public sealed class ImapMailboxReader(IOptions<EmailOptions> options) : IMailbox
         await client.Inbox.OpenAsync(FolderAccess.ReadWrite, cancellationToken);
         await client.Inbox.AddFlagsAsync(new UniqueId(uint.Parse(email.ProviderId)), MessageFlags.Seen, silent: true, cancellationToken);
         await client.DisconnectAsync(true, cancellationToken);
+    }
+
+    /// <summary>Real attachments only; images embedded in the body (signatures, logos) are skipped.</summary>
+    private static async Task<IReadOnlyList<InboundFile>> AttachmentsAsync(MimeMessage message, CancellationToken cancellationToken)
+    {
+        var files = new List<InboundFile>();
+        foreach (var part in message.Attachments.OfType<MimePart>().Where(p => p.Content is not null))
+        {
+            using var buffer = new MemoryStream();
+            await part.Content.DecodeToAsync(buffer, cancellationToken);
+            files.Add(new InboundFile(part.FileName ?? "archivo", part.ContentType.MimeType, buffer.ToArray()));
+        }
+
+        return files;
     }
 
     private async Task<ImapClient> ConnectAsync(CancellationToken cancellationToken)

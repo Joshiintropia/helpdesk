@@ -3,8 +3,10 @@ using HelpDesk.Api.Auth;
 using HelpDesk.Api.Endpoints;
 using HelpDesk.Domain;
 using HelpDesk.Infrastructure;
+using HelpDesk.Infrastructure.Attachments;
 using HelpDesk.Infrastructure.Identity;
 using HelpDesk.Infrastructure.Persistence;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +14,13 @@ using Microsoft.AspNetCore.Identity;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Keys that sign the session cookie and survey links. Kept with the attachments in the data volume, so a
+// restarted container does not sign everyone out or break the links already emailed.
+var storagePath = builder.Configuration.GetSection(StorageOptions.Section).Get<StorageOptions>()?.Path ?? new StorageOptions().Path;
+builder.Services.AddDataProtection()
+    .SetApplicationName("HelpDesk")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(storagePath, "keys")));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUser>();
@@ -109,6 +118,8 @@ app.MapAreaEndpoints();
 app.MapTicketEndpoints();
 app.MapSlaEndpoints();
 app.MapMetricsEndpoints();
+app.MapAttachmentEndpoints();
+app.MapSurveyEndpoints();
 
 app.Run();
 
